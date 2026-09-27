@@ -37,4 +37,14 @@ class AVLTree {
         return x;
     }
 
+    AVLNode* rotateLeft(AVLNode *x) {
+        AVLNode *y = x->right; 
+        AVLNode *t2 = y->left;
+        y->left = x; 
+        x->right = t2;
+        x->height = 1 + myMax(getHeight(x->left), getHeight(x->right));
+        y->height = 1 + myMax(getHeight(y->left), getHeight(y->right));
+        return y;
+    }
+
 };
