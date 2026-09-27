@@ -1,6 +1,6 @@
 #pragma once
-#include<vector>
-#include<cstdlib>
+#include <vector>
+#include <cstdlib>
 
 
 
@@ -9,7 +9,9 @@ inline bool chance(int percent)
     return (std::rand() % 100) < percent;
 }
 
-inline void runChaosEngine(std::vector<satellite*> &sats, std::vector<Debris> &debrisList,int %nextDebrisId,std::ofstream &logFile,double simTime){
+inline void runChaosEngine(std::vector<satellite*> &sats, 
+    std::vector<Debris> &debrisList,int %nextDebrisId,
+    std::ofstream &logFile,double simTime){
     if(sats.empty()) 
         return;
     // OOP Unit 2: Pointers to objects
