@@ -18,3 +18,23 @@ inline long long getSectorKey(Vector3 p) {
     long long bz = (long long) std::floor(p.z / 100.0);
     return bx * 1000000LL + by * 1000LL + bz;
 }
+
+class AVLTree {
+    AVLNode *root;
+
+    int getHeight(AVLNode *n) { return n ? n->height : 0; }
+    int getBalance(AVLNode *n) { return n ? getHeight(n->left) - getHeight(n->right) : 0; }
+    int myMax(int a, int b) { return (a > b) ? a : b; }
+
+    // DSA Unit 4: Rotation of AVL Tree
+    AVLNode* rotateRight(AVLNode *y) {
+        AVLNode *x = y->left; 
+        AVLNode *t2 = x->right;
+        x->right = y; 
+        y->left = t2;
+        y->height = 1 + myMax(getHeight(y->left), getHeight(y->right));
+        x->height = 1 + myMax(getHeight(x->left), getHeight(x->right));
+        return x;
+    }
+
+};
