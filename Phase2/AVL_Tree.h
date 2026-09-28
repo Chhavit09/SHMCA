@@ -47,4 +47,39 @@ class AVLTree {
         return y;
     }
 
+    // DSA Unit 4: Insertion in AVL Trees
+    AVLNode* insertHelper(AVLNode *node, long long key, int id) {
+        if (node == NULL) {
+            AVLNode *n = new AVLNode();
+            n->key = key; 
+            n->debrisIds.push_back(id);
+            n->left = NULL; 
+            n->right = NULL; 
+            n->height = 1;
+            return n;
+        }
+        if (key < node->key) {
+            node->left = insertHelper(node->left, key, id);
+        } else if (key > node->key) {
+            node->right = insertHelper(node->right, key, id);
+        } else { 
+            node->debrisIds.push_back(id); 
+            return node; 
+        }
+
+        node->height = 1 + myMax(getHeight(node->left), getHeight(node->right));
+        int balance = getBalance(node);
+
+        if (balance > 1 && key < node->left->key) return rotateRight(node);
+        if (balance < -1 && key > node->right->key) return rotateLeft(node);
+        if (balance > 1 && key > node->left->key) { 
+            node->left = rotateLeft(node->left); 
+            return rotateRight(node); 
+        }
+        if (balance < -1 && key < node->right->key) { 
+            node->right = rotateRight(node->right); 
+            return rotateLeft(node); 
+        }
+        return node;
+    }
 };
