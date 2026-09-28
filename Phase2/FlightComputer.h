@@ -22,3 +22,23 @@ public:
         else if (distance >= 5.0) return DANGER;
         else return CRITICAL;
     }
+    
+    //  GET RISK NAME
+    string getRiskName(RiskLevel risk) {
+        if (risk == SAFE) return "SAFE";
+        if (risk == WARNING) return "WARNING";
+        if (risk == DANGER) return "DANGER";
+        return "CRITICAL";
+    }
+
+    //  AUTOMATIC COLLISION DECISION
+    // OOP Unit 2: Passing objects as arguments
+
+    void handleCollisionThreat(Satellite *sat, Debris *debris, double distance, 
+        ofstream &logFile, double simTime) {
+        if (sat == NULL || debris == NULL) 
+            return;
+        if (sat->isDisabled()) 
+            return;
+
+        RiskLevel risk = checkCollisionRisk(distance);
