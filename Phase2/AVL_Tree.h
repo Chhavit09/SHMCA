@@ -20,11 +20,20 @@ inline long long getSectorKey(Vector3 p) {
 }
 
 class AVLTree {
+    
     AVLNode *root;
 
-    int getHeight(AVLNode *n) { return n ? n->height : 0; }
-    int getBalance(AVLNode *n) { return n ? getHeight(n->left) - getHeight(n->right) : 0; }
-    int myMax(int a, int b) { return (a > b) ? a : b; }
+    int getHeight(AVLNode *n) { 
+        return n ? n->height : 0; 
+    }
+
+    int getBalance(AVLNode *n) { 
+        return n ? getHeight(n->left) - getHeight(n->right) : 0; 
+    }
+
+    int myMax(int a, int b) { 
+        return (a > b) ? a : b; 
+    }
 
     // DSA Unit 4: Rotation of AVL Tree
     AVLNode* rotateRight(AVLNode *y) {
@@ -70,8 +79,10 @@ class AVLTree {
         node->height = 1 + myMax(getHeight(node->left), getHeight(node->right));
         int balance = getBalance(node);
 
-        if (balance > 1 && key < node->left->key) return rotateRight(node);
-        if (balance < -1 && key > node->right->key) return rotateLeft(node);
+        if (balance > 1 && key < node->left->key) 
+            return rotateRight(node);
+        if (balance < -1 && key > node->right->key) 
+            return rotateLeft(node);
         if (balance > 1 && key > node->left->key) { 
             node->left = rotateLeft(node->left); 
             return rotateRight(node); 
@@ -81,5 +92,44 @@ class AVLTree {
             return rotateLeft(node); 
         }
         return node;
+    }
+
+    std::vector<int> searchHelper(AVLNode *node, long long key) {
+        if (node == NULL) 
+            return std::vector<int>();
+        if (key == node->key) 
+            return node->debrisIds;
+        if (key < node->key) 
+            return searchHelper(node->left, key);
+        return searchHelper(node->right, key);
+    }
+
+    int countHelper(AVLNode *node) {
+        if (node == NULL) return 0;
+        return 1 + countHelper(node->left) + countHelper(node->right);
+    }
+
+    void clearHelper(AVLNode *node) {
+        if (node == NULL) return;
+        clearHelper(node->left); 
+        clearHelper(node->right); 
+        delete node; // OOP Unit 1:DMA (delete)
+    }
+
+public:
+    AVLTree() { 
+        root = NULL; 
+    }
+    ~AVLTree() { 
+        clearHelper(root); 
+    }
+    void insert(long long key, int id) { 
+        root = insertHelper(root, key, id); 
+    }
+    std::vector<int> search(long long key) { 
+        return searchHelper(root, key); 
+    }
+    int countNodes() { 
+        return countHelper(root); 
     }
 };
