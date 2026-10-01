@@ -42,3 +42,18 @@ public:
             return;
 
         RiskLevel risk = checkCollisionRisk(distance);
+
+        if (risk == SAFE) return;
+
+        if (risk == WARNING) {
+            cout << "[WARNING] " << sat->getName() << " -> Debris #" << debris->id << " Distance: " << distance << endl;
+            logFile << "[t=" << simTime << "s] [WARNING] " << sat->getName() << " debris #" << debris->id << " distance=" << distance << "\n";
+            return;
+        }
+
+        cout << "\n!! COLLISION ALERT !!" << endl;
+        cout << "Satellite : " << sat->getName() << endl;
+        cout << "Debris    : #" << debris->id << endl;
+        cout << "Distance  : " << distance << endl;
+        cout << "Risk      : " << getRiskName(risk) << endl;
+        logFile << "[t=" << simTime << "s] [COLLISION ALERT] " << sat->getName() << " debris #" << debris->id << " distance=" << distance << " risk=" << getRiskName(risk) << "\n";
