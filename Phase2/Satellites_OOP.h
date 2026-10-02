@@ -177,3 +177,33 @@ public:
         : Satellite(id_, name_, pos_, vel_) {
         calibration = 100;
     }
+
+    std::string getType() override { return "Imaging Satellite"; }
+    
+    void runDiagnostics(std::ofstream &logFile, double simTime) override {
+        if (disabled) return;
+        
+        double decay = (battery < 30) ? 0.5 : 0.05;
+        calibration -= decay;
+        if (calibration < 0) calibration = 0;
+        
+        if (software < 75) autoPatch(logFile, simTime, "corrupted image compression logic");
+        
+        if (calibration < 50) { 
+            calibration = 100; 
+            logFile << "[t=" << simTime << "s] [PATCH] " << name << " sensor recalibrated\n"; 
+        }
+    }
+    
+    std::string getStatusLine() override {
+        std::stringstream ss;
+        ss << std::fixed << std::setprecision(1);
+        ss << name << " [" << getType() << "] orbiting Earth";
+        if (disabled) {
+            ss << " -- ** UNDER REPAIR ** in " << repairTicksRemaining << " tick(s)";
+        } else {
+            ss << " | Batt=" << battery << "% SW=" << software << "% Calib=" << calibration << "% Fuel=" << fuel << "kg";
+        }
+        return ss.str();
+    }
+};
