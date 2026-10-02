@@ -30,4 +30,13 @@ inline void runChaosEngine(std::vector<satellite*> &sats,
         s->hitByThrusterFailure();
         logFile << "[t=" << simTime << "s] [CHAOS] Thruster burnout on " << s->getName() << "\n";
     }
+    if (chance(5) && !s->isDisabled()) {
+        s->hitByProgramBug();
+        logFile << "[t=" << simTime << "s] [CHAOS] Critical program bug in " << s->getName() << " code\n";
+    }
+
+    if (chance(3) && !s->isDisabled() && s->areSensorsOk()) {
+        s->hitBySensorFault();
+        logFile << "[t=" << simTime << "s] [CHAOS] Sensor hardware fault on " << s->getName() << "\n";
+    }
 }
