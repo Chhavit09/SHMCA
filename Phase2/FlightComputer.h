@@ -91,3 +91,15 @@ public:
         cout << "ACTION: EVASIVE BURN ACTIVATED\nACTION: Satellite velocity changed\nFUEL USED: 2.5 kg\n";
         logFile << "[t=" << simTime << "s] [DECISION] " << sat->getName() << " performed evasive burn against debris #" << debris->id << " fuel=2.5kg\n";
     }
+        // HEALTH DECISION FUNCTION
+    void handleHealthDecision(Satellite *sat, ofstream &logFile, double simTime) {
+        if (sat == NULL) return;
+        if (sat->isDisabled()) return;
+
+        // CHECKING SENSOR STATUS
+        if (!sat->areSensorsOk()) {
+            cout << "\n[HEALTH ALERT] " << sat->getName() << " sensor fault detected." << endl;
+            logFile << "[t=" << simTime << "s] [HEALTH] " << sat->getName() << " sensor fault detected\n";
+            sat->sendForRepair(logFile, simTime, "sensor hardware fault");
+            return;
+        }
