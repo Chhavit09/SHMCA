@@ -39,4 +39,27 @@ inline void runChaosEngine(std::vector<satellite*> &sats,
         s->hitBySensorFault();
         logFile << "[t=" << simTime << "s] [CHAOS] Sensor hardware fault on " << s->getName() << "\n";
     }
+    if (chance(25)) {
+        Vector3 base = s->getPos();
+        Vector3 spawnPos = base + Vector3((std::rand() % 90 - 45), (std::rand() % 90 - 45), (std::rand() % 90 - 45));
+        
+        Vector3 toSat = base - spawnPos;
+        double mag = dist3D(base, spawnPos);
+        
+        Vector3 dir(0, 0, 1);
+        if (mag > 0.001) {
+            dir = toSat * (1.0 / mag);
+        }
+        Vector3 vel = s->getVel() + dir * (0.1 + (std::rand() % 20) / 100.0);
+        
+        Debris d; 
+        d.id = nextDebrisId++; 
+        d.pos = spawnPos; 
+        d.vel = vel;
+        debrisList.push_back(d);
+        
+        logFile << "[t=" << simTime << "s] [CHAOS] New debris #" << d.id << " near " << s->getName() << "\n";
+
+        }
 }
+
