@@ -66,3 +66,26 @@ public:
             }
         }
     }
+
+Threat popMin() {
+        Threat top = h[0];
+        h[0] = h[h.size() - 1];
+        h.pop_back();
+        int i = 0, n = h.size();
+        while (true) {
+            int left = 2 * i + 1;
+            int right = 2 * i + 2;
+            int smallest = i;
+            
+            if (left < n && h[left].distance < h[smallest].distance) 
+                 smallest = left;
+            if (right < n && h[right].distance < h[smallest].distance)
+                 smallest = right;
+            if (smallest == i) 
+                 break;        
+            swapThreat(i, smallest);
+            i = smallest;
+        }
+        return top;
+    }
+};
