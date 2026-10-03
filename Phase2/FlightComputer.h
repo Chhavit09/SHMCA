@@ -72,3 +72,22 @@ public:
             sat->sendForRepair(logFile, simTime, "out of propellant");
             return;
         }
+
+        
+        // EVASIVE BURN
+        Vector3 satellitePosition = sat->getPos();
+        Vector3 debrisPosition = debris->pos;
+        Vector3 relativePosition = debrisPosition - satellitePosition;
+        double magnitude = dist3D(satellitePosition, debrisPosition);
+        
+        Vector3 direction(0, 0, 1);
+        if (magnitude > 0.001) {
+            direction = relativePosition * (-1.0 / magnitude);
+        }
+
+        Vector3 burnAmount = direction * 0.08;
+        sat->burn(burnAmount);
+
+        cout << "ACTION: EVASIVE BURN ACTIVATED\nACTION: Satellite velocity changed\nFUEL USED: 2.5 kg\n";
+        logFile << "[t=" << simTime << "s] [DECISION] " << sat->getName() << " performed evasive burn against debris #" << debris->id << " fuel=2.5kg\n";
+    }
