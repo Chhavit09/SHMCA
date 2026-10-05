@@ -1,7 +1,7 @@
 #pragma once
 #include <vector>
 #include <cstdlib>
-
+#include <fstream>
 
 
 inline bool chance(int percent)
@@ -9,8 +9,8 @@ inline bool chance(int percent)
     return (std::rand() % 100) < percent;
 }
 
-inline void runChaosEngine(std::vector<satellite*> &sats, 
-    std::vector<Debris> &debrisList,int %nextDebrisId,
+inline void runChaosEngine(std::vector<Satellite*> &sats, 
+    std::vector<Debris> &debrisList,int &nextDebrisId,
     std::ofstream &logFile,double simTime){
     if(sats.empty()) 
         return;
@@ -25,6 +25,7 @@ inline void runChaosEngine(std::vector<satellite*> &sats,
     if (chance(7) && !s->isDisabled()) {
         double amt = 3 + std::rand() % 8;
         s->hitByBatteryDrain(amt);
+        logFile << "[t=" << simTime << "s] [CHAOS] Battery drain on " << s->getName() << " battery -" << amount << "\n";
     }
     if (chance(2) && !s->isDisabled() && s->isThrusterOk()) {
         s->hitByThrusterFailure();
