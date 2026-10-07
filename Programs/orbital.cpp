@@ -35,3 +35,43 @@ inline double dist3D(Vector3 a, Vector3 b) {
 #include "Satellites_OOP.h"
 #include "FlightComputer.h"
 #include "Chaos_Engine.h"
+
+int REPAIR_DURATION_TICKS = 20;
+
+Satellite* createSatelliteAroundEarth(int id, string name, int typeChoice) {
+    double orbitRadius = 4200 + 600 + rand() % 400; 
+    double angle = (rand() % 360) * 3.14159265 / 180.0;
+    double speed = 6.5 + (rand() % 20) / 10.0;
+    
+    Vector3 pos(orbitRadius * cos(angle), orbitRadius * sin(angle), (rand() % 200 - 100) / 10.0);
+    Vector3 vel(-sin(angle) * speed, cos(angle) * speed, 0);
+
+    if (typeChoice == 1) {
+        return new CommunicationSatellite(id, name, pos, vel);
+    } else {
+        return new ImagingSatellite(id, name, pos, vel);
+    }
+}
+
+int main() {
+    srand((unsigned) time(0));
+    cout << "---------------------------------\n";
+    cout << " ORBITAL - Earth Orbit Edition\n";
+    cout << "---------------------------------\n\n";
+
+    int numSats;
+    cout << "How many satellites in Earth orbit? (1-6): ";
+    cin >> numSats;
+    if (numSats < 1) numSats = 1;
+    if (numSats > 6) numSats = 6;
+
+    vector<Satellite*> satellites;
+    for (int i = 0; i < numSats; i++) {
+        string name;
+        int typeChoice;
+        cout << "\nSatellite #" << (i + 1) << " Name (no spaces): ";
+        cin >> name;
+        cout << "Type (1: Communication, 2: Imaging): ";
+        cin >> typeChoice;
+        satellites.push_back(createSatelliteAroundEarth(i + 1, name, typeChoice));
+    }
