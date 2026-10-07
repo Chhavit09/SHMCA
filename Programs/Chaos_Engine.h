@@ -25,7 +25,7 @@ inline void runChaosEngine(std::vector<Satellite*> &sats,
     if (chance(7) && !s->isDisabled()) {
         double amt = 3 + std::rand() % 8;
         s->hitByBatteryDrain(amt);
-        logFile << "[t=" << simTime << "s] [CHAOS] Battery drain on " << s->getName() << " battery -" << amount << "\n";
+        logFile << "[t=" << simTime << "s] [CHAOS] Battery drain on " << s->getName() << " battery -" << amt << "\n";
     }
     if (chance(2) && !s->isDisabled() && s->isThrusterOk()) {
         s->hitByThrusterFailure();
