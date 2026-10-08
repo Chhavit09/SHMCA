@@ -165,4 +165,38 @@ int main()
                     }
                 }
             }
-    
+            while (!heap.isEmpty()) 
+                    {
+                        Threat th = heap.popMin();
+                        Satellite *sat = NULL;
+                        for (int i = 0; i < satellites.size(); i++) 
+                        {
+                            if (satellites[i]->getId() == th.satId) 
+                            { 
+                                sat = satellites[i]; 
+                                break; 
+                            }
+                        }
+                        Debris *d = findDebrisById(debrisList, th.debId);
+                        flightComputer.handleCollisionThreat(sat, d, th.distance, logFile, simTime);
+                    }
+                    if (tick % 5 == 0 || tick == totalTicks) 
+                    {
+                        cout << "\n----- STATUS at t=" << simTime << "s -----\n";
+                        for (int i = 0; i < satellites.size(); i++) 
+                        {
+                            cout << satellites[i]->getStatusLine() << "\n";
+                        }
+                        cout << "\n";
+                    }
+                    usleep(60000);
+                }
+                logFile << "----- END OF LOG -----\n";
+                logFile.close();
+                for (int i = 0; i < satellites.size(); i++) 
+                {
+                    delete satellites[i]; 
+                }
+                return 0;
+            }
+                
