@@ -107,3 +107,29 @@ int main()
             debrisList.push_back(d);
         }
     }
+    // OOP Unit 2: Instantiate the FlightComputer object
+
+    FlightComputer flightComputer; 
+    double simTime = 0, dt = 1.0;
+    const double WATCH_DIST = 15.0;
+    for (int tick = 1; tick <= totalTicks; tick++) {
+        simTime += dt;
+        runChaosEngine(satellites, debrisList, nextDebrisId, logFile, simTime);
+        for (int i = 0; i < debrisList.size(); i++) {
+            debrisList[i].pos = debrisList[i].pos + debrisList[i].vel * dt;
+        }
+
+        // OOP Unit 2: Instantiate AVLTree object
+
+        AVLTree tree;
+        for (int i = 0; i < debrisList.size(); i++) {
+            tree.insert(getSectorKey(debrisList[i].pos), debrisList[i].id);
+        }
+        for (int i = 0; i < satellites.size(); i++) {
+            if (satellites[i]->isDisabled()) { 
+                satellites[i]->tickRepair(logFile, simTime); 
+                continue; 
+            }
+            satellites[i]->moveOneStep(dt);
+            flightComputer.handleHealthDecision(satellites[i], logFile, simTime);
+        }
