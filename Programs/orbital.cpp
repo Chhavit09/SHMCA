@@ -75,3 +75,25 @@ int main() {
         cin >> typeChoice;
         satellites.push_back(createSatelliteAroundEarth(i + 1, name, typeChoice));
     }
+    int totalTicks, debrisPerSat;
+    cout << "\nTicks to run? (recommended 100-300): "; 
+    cin >> totalTicks;
+    cout << "Repair duration ticks? (recommended 15-30): "; 
+    cin >> REPAIR_DURATION_TICKS;
+    cout << "Starting debris per satellite? (recommended 4-8): "; 
+    cin >> debrisPerSat;
+
+    ofstream logFile("blackbox.txt");
+    logFile << "----- ORBITAL BLACKBOX LOG -----\n";
+    
+    vector<Debris> debrisList;
+    int nextDebrisId = 1;
+    for (int s = 0; s < satellites.size(); s++) {
+        for (int i = 0; i < debrisPerSat; i++) {
+            Debris d; 
+            d.id = nextDebrisId++;
+            d.pos = satellites[s]->getPos() + Vector3(rand() % 120 - 60, rand() % 120 - 60, rand() % 120 - 60);
+            d.vel = satellites[s]->getVel() + Vector3((rand() % 70 - 35) / 100.0, (rand() % 70 - 35) / 100.0, (rand() % 70 - 35) / 100.0);
+            debrisList.push_back(d);
+        }
+    }
