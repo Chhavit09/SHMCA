@@ -133,3 +133,35 @@ int main()
             satellites[i]->moveOneStep(dt);
             flightComputer.handleHealthDecision(satellites[i], logFile, simTime);
         }
+MinHeap heap;
+        for (int i = 0; i < satellites.size(); i++) 
+        {
+            if (satellites[i]->isDisabled()) 
+                continue;
+            Vector3 sp = satellites[i]->getPos();
+            long long bx = floor(sp.x / 100.0);
+            long long by = floor(sp.y / 100.0);
+            long long bz = floor(sp.z / 100.0);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) 
+                {
+                    for (int dz = -1; dz <= 1; dz++) 
+                    {
+                        long long key = (bx + dx) * 1000000LL + (by + dy) * 1000LL + (bz + dz);
+                        vector<int> ids = tree.search(key);
+                        for (int k = 0; k < ids.size(); k++) 
+                        {
+                            Debris *d = findDebrisById(debrisList, ids[k]);
+                            if (d != NULL && dist3D(sp, d->pos) < WATCH_DIST) 
+                            {
+                                Threat t;
+                                t.satId = satellites[i]->getId();
+                                t.debId = d->id;
+                                t.distance = dist3D(sp, d->pos);
+                                heap.push(t);
+                            }
+                        }
+                    }
+                }
+            }
+        }
