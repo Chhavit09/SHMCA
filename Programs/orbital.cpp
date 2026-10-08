@@ -10,7 +10,8 @@ using namespace std;
 
 // OOP Unit 2: Fundamentals of Operator Overloading
 
-struct Vector3 {
+struct Vector3 
+{
     double x, y, z;
     Vector3() { x = 0; y = 0; z = 0; }
     Vector3(double a, double b, double c) { x = a; y = b; z = c; }
@@ -23,7 +24,8 @@ struct Vector3 {
     }
 };
 
-inline double dist3D(Vector3 a, Vector3 b) {
+inline double dist3D(Vector3 a, Vector3 b) 
+{
     double dx = a.x - b.x;
     double dy = a.y - b.y;
     double dz = a.z - b.z;
@@ -38,7 +40,8 @@ inline double dist3D(Vector3 a, Vector3 b) {
 
 int REPAIR_DURATION_TICKS = 20;
 
-Satellite* createSatelliteAroundEarth(int id, string name, int typeChoice) {
+Satellite* createSatelliteAroundEarth(int id, string name, int typeChoice) 
+{
     double orbitRadius = 4200 + 600 + rand() % 400; 
     double angle = (rand() % 360) * 3.14159265 / 180.0;
     double speed = 6.5 + (rand() % 20) / 10.0;
@@ -46,14 +49,18 @@ Satellite* createSatelliteAroundEarth(int id, string name, int typeChoice) {
     Vector3 pos(orbitRadius * cos(angle), orbitRadius * sin(angle), (rand() % 200 - 100) / 10.0);
     Vector3 vel(-sin(angle) * speed, cos(angle) * speed, 0);
 
-    if (typeChoice == 1) {
+    if (typeChoice == 1) 
+    {
         return new CommunicationSatellite(id, name, pos, vel);
-    } else {
+    } 
+    else 
+    {
         return new ImagingSatellite(id, name, pos, vel);
     }
 }
 
-int main() {
+int main() 
+{
     srand((unsigned) time(0));
     cout << "---------------------------------\n";
     cout << " ORBITAL - Earth Orbit Edition\n";
@@ -66,7 +73,8 @@ int main() {
     if (numSats > 6) numSats = 6;
 
     vector<Satellite*> satellites;
-    for (int i = 0; i < numSats; i++) {
+    for (int i = 0; i < numSats; i++) 
+    {
         string name;
         int typeChoice;
         cout << "\nSatellite #" << (i + 1) << " Name (no spaces): ";
@@ -88,8 +96,10 @@ int main() {
     
     vector<Debris> debrisList;
     int nextDebrisId = 1;
-    for (int s = 0; s < satellites.size(); s++) {
-        for (int i = 0; i < debrisPerSat; i++) {
+    for (int s = 0; s < satellites.size(); s++) 
+    {
+        for (int i = 0; i < debrisPerSat; i++) 
+        {
             Debris d; 
             d.id = nextDebrisId++;
             d.pos = satellites[s]->getPos() + Vector3(rand() % 120 - 60, rand() % 120 - 60, rand() % 120 - 60);
