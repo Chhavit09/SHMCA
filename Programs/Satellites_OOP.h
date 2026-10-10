@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string>
 #include <iomanip>
+#include <cmath>
 
 extern int REPAIR_DURATION_TICKS;
 
@@ -53,11 +54,18 @@ public:
     // OOP Unit 4: Pure virtual functions
     virtual std::string getType() = 0;
     virtual void runDiagnostics(std::ofstream &logFile, double simTime) = 0;
-    virtual std::string getStatusLine() = 0;
+    virtual std::string getStatusLine(double nearestSatDist, std::string nearestSatName) = 0;
 
     void moveOneStep(double dt) {
         if (disabled) return;
-        pos = pos + vel * dt;
+        double r = std::sqrt(pos.x*pos.x + pos.y*pos.y + pos.z*pos.z);
+        if (r > 0) {
+            double gravityStrength = (6.5 * 6.5) / r; 
+            Vector3 gravity(-(pos.x / r) * gravityStrength, -(pos.y / r) * gravityStrength, -(pos.z / r) * gravityStrength);
+            vel = vel + gravity * dt; 
+        }
+        pos = pos + vel * dt;         
+        
         battery -= 0.02 * dt;
         if (battery < 0) battery = 0;
         batteryHistory.push(battery);
@@ -156,14 +164,20 @@ public:
     
     }
     
-    std::string getStatusLine() override {
+    std::string getStatusLine(double nearestSatDist, std::string nearestSatName) override {
         std::stringstream ss;
         ss << std::fixed << std::setprecision(1);
-        ss << name << " [" << getType() << "] orbiting Earth";
+        
+        double earthDist = std::sqrt(pos.x*pos.x + pos.y*pos.y + pos.z*pos.z);
+        
+        ss << name << " [" << getType() << "]\n";
         if (disabled) {
-            ss << " -- ** UNDER REPAIR ** in " << repairTicksRemaining << " tick(s)";
+            ss << "    -> ** UNDER REPAIR ** in " << repairTicksRemaining << " tick(s)";
         } else {
-            ss << " | Batt=" << battery << "% SW=" << software << "% Signal=" << signal << "% Fuel=" << fuel << "kg";
+            ss << "    -> Batt=" << battery << "% SW=" << software << "% Signal=" << signal << "% Fuel=" << fuel << "kg\n";
+           
+            ss << "    -> Earth Dist: " << earthDist << " units | Nearest Sat: " << nearestSatName;
+            if (nearestSatName != "None") ss << " (" << nearestSatDist << " units)";
         }
         return ss.str();
     }
@@ -195,14 +209,17 @@ public:
         }
     }
     
-    std::string getStatusLine() override {
+    std::string getStatusLine(double nearestSatDist, std::string nearestSatName) override {
         std::stringstream ss;
         ss << std::fixed << std::setprecision(1);
-        ss << name << " [" << getType() << "] orbiting Earth";
+        double earthDist = std::sqrt(pos.x*pos.x + pos.y*pos.y + pos.z*pos.z);
+        ss << name << " [" << getType() << "]\n";
         if (disabled) {
-            ss << " -- ** UNDER REPAIR ** in " << repairTicksRemaining << " tick(s)";
+            ss << "    -> ** UNDER REPAIR ** in " << repairTicksRemaining << " tick(s)";
         } else {
-            ss << " | Batt=" << battery << "% SW=" << software << "% Calib=" << calibration << "% Fuel=" << fuel << "kg";
+            ss << "    -> Batt=" << battery << "% SW=" << software << "% Calib=" << calibration << "% Fuel=" << fuel << "kg\n";
+            ss << "    -> Earth Dist: " << earthDist << " units | Nearest Sat: " << nearestSatName;
+            if (nearestSatName != "None") ss << " (" << nearestSatDist << " units)";
         }
         return ss.str();
     }
