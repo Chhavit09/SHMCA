@@ -69,6 +69,8 @@ public:
         battery -= 0.02 * dt;
         if (battery < 0) battery = 0;
         batteryHistory.push(battery);
+        fuel -= 0.01 * dt; 
+        if (fuel < 0) fuel = 0;
     }
 
     void burn(Vector3 dv) { vel = vel + dv; }
