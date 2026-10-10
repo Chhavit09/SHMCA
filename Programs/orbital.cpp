@@ -223,6 +223,48 @@ int main()
     logFile << "----- END OF LOG -----\n";
     logFile.close();
     teleFile.close();
+    
+    char searchAgain = 'y';
+    while (searchAgain == 'y' || searchAgain == 'Y') {
+        cout << "\n---------------------------------\n";
+        cout << "Do you want to search for a satellite's final status? (y/n): ";
+        cin >> searchAgain;
+        if (searchAgain == 'y' || searchAgain == 'Y') {
+            string searchName;
+            cout << "Enter the exact name of the satellite: ";
+            cin >> searchName;
+            bool found = false;
+            
+            // linear search 
+            for (int i = 0; i < satellites.size(); i++) {
+                if (satellites[i]->getName() == searchName) {
+                    found = true;
+                    cout << "\n>>> SATELLITE FOUND <<<\n";
+                    double minDist = 9999999.0;
+                    string nearestName = "None";
+                    for (int j = 0; j < satellites.size(); j++) {
+                        if (i == j) continue;
+                        double d = dist3D(satellites[i]->getPos(), satellites[j]->getPos());
+                        if (d < minDist) {
+                            minDist = d;
+                            nearestName = satellites[j]->getName();
+                        }
+                    }
+                    if (satellites.size() == 1) {
+                        minDist = 0.0;
+                    }
+                    cout << satellites[i]->getStatusLine(minDist, nearestName) << "\n";
+                    cout << "    -> Final Coordinates: X=" << satellites[i]->getPos().x 
+                         << ", Y=" << satellites[i]->getPos().y 
+                         << ", Z=" << satellites[i]->getPos().z << "\n";
+                    break;
+                }
+            }
+            if (!found) {
+                cout << "\n[ERROR] Satellite '" << searchName << "' not found in Earth orbit.\n";
+            }
+        }
+    }
     for (int i = 0; i < satellites.size(); i++) {
         delete satellites[i]; 
     }
