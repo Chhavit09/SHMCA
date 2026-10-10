@@ -68,10 +68,11 @@ int main()
 
     int numSats;
     cout << "How many satellites in Earth orbit? (1-6): ";
-    cin >> numSats;
-    if (numSats < 1) numSats = 1;
-    if (numSats > 6) numSats = 6;
-
+    while (!(cin >> numSats) || numSats < 1 || numSats > 6) {
+        cout << "Invalid input! Please enter a number between 1 and 6: ";
+        cin.clear();
+        cin.ignore(256, '\n');
+    }
     vector<Satellite*> satellites;
     for (int i = 0; i < numSats; i++) 
     {
@@ -80,7 +81,11 @@ int main()
         cout << "\nSatellite #" << (i + 1) << " Name (no spaces): ";
         cin >> name;
         cout << "Type (1: Communication, 2: Imaging): ";
-        cin >> typeChoice;
+        while (!(cin >> typeChoice) || (typeChoice != 1 && typeChoice != 2)) {
+            cout << "Invalid input! Please enter strictly 1 or 2: ";
+            cin.clear();
+            cin.ignore(256, '\n');
+        }
         satellites.push_back(createSatelliteAroundEarth(i + 1, name, typeChoice));
     }
     int totalTicks, debrisPerSat;
@@ -93,6 +98,9 @@ int main()
 
     ofstream logFile("blackbox.txt");
     logFile << "----- ORBITAL BLACKBOX LOG -----\n";
+
+    ofstream teleFile("telemetry.csv");
+    teleFile << "Tick,Type,ID_or_Name,X,Y,Z\n";
     
     vector<Debris> debrisList;
     int nextDebrisId = 1;
@@ -116,6 +124,12 @@ int main()
         simTime += dt;
         runChaosEngine(satellites, debrisList, nextDebrisId, logFile, simTime);
         for (int i = 0; i < debrisList.size(); i++) {
+            double r = std::sqrt(debrisList[i].pos.x*debrisList[i].pos.x + debrisList[i].pos.y*debrisList[i].pos.y + debrisList[i].pos.z*debrisList[i].pos.z);
+            if (r > 0) {
+                double gravityStrength = (6.5 * 6.5) / r;
+                Vector3 gravity(-(debrisList[i].pos.x / r) * gravityStrength, -(debrisList[i].pos.y / r) * gravityStrength, -(debrisList[i].pos.z / r) * gravityStrength);
+                debrisList[i].vel = debrisList[i].vel + gravity * dt;
+            }
             debrisList[i].pos = debrisList[i].pos + debrisList[i].vel * dt;
         }
 
@@ -133,6 +147,14 @@ int main()
             satellites[i]->moveOneStep(dt);
             flightComputer.handleHealthDecision(satellites[i], logFile, simTime);
         }
+        
+        for (int i = 0; i < satellites.size(); i++) {
+            teleFile << tick << ",Sat," << satellites[i]->getName() << "," << satellites[i]->getPos().x << "," << satellites[i]->getPos().y << "," << satellites[i]->getPos().z << "\n";
+        }
+        for (int i = 0; i < debrisList.size(); i++) {
+            teleFile << tick << ",Debris," << debrisList[i].id << "," << debrisList[i].pos.x << "," << debrisList[i].pos.y << "," << debrisList[i].pos.z << "\n";
+        }
+        
         MinHeap heap;
             for (int i = 0; i < satellites.size(); i++) 
             {
@@ -180,7 +202,19 @@ int main()
         if (tick % 5 == 0 || tick == totalTicks) {
             cout << "\n----- STATUS at t=" << simTime << "s -----\n";
             for (int i = 0; i < satellites.size(); i++) {
-                cout << satellites[i]->getStatusLine() << "\n";
+               double minDist = 9999999.0;
+                string nearestName = "None";
+                for (int j = 0; j < satellites.size(); j++) {
+                    if (i == j) continue; 
+                    double d = dist3D(satellites[i]->getPos(), satellites[j]->getPos());
+                    if (d < minDist) {
+                        minDist = d;
+                        nearestName = satellites[j]->getName();
+                    }
+                }
+                if (satellites.size() == 1) minDist = 0.0;
+                
+                cout << satellites[i]->getStatusLine(minDist, nearestName) << "\n";
             }
             cout << "\n";
         }
@@ -188,6 +222,7 @@ int main()
     }
     logFile << "----- END OF LOG -----\n";
     logFile.close();
+    teleFile.close();
     for (int i = 0; i < satellites.size(); i++) {
         delete satellites[i]; 
     }
