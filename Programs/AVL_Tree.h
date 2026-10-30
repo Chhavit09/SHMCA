@@ -1,15 +1,24 @@
 #pragma once
 #include <vector>
+#include <string>
 #include <cmath>
 
 // DSA Unit 4: AVL Trees node structure
 struct AVLNode {
     long long key;
     std::vector<int> debrisIds;
+    bool isRedZone;            
+    std::string flaggedBySat;
     AVLNode *left;
     AVLNode *right;
     int height;
 };
+
+struct RedZoneRecord {         
+    long long sectorKey; 
+    std::string flaggedBySat;
+    int debrisCount; 
+};  
 
 // It generates a unique sector key for spatial mapping
 inline long long getSectorKey(Vector3 p) {
@@ -20,17 +29,13 @@ inline long long getSectorKey(Vector3 p) {
 }
 
 class AVLTree {
-    
     AVLNode *root;
-
     int getHeight(AVLNode *n) { 
         return n ? n->height : 0; 
     }
-
     int getBalance(AVLNode *n) { 
         return n ? getHeight(n->left) - getHeight(n->right) : 0; 
     }
-
     int myMax(int a, int b) { 
         return (a > b) ? a : b; 
     }
@@ -62,6 +67,8 @@ class AVLTree {
             AVLNode *n = new AVLNode();
             n->key = key; 
             n->debrisIds.push_back(id);
+            n->isRedZone = false;         
+            n->flaggedBySat = "None"; 
             n->left = NULL; 
             n->right = NULL; 
             n->height = 1;
@@ -73,12 +80,14 @@ class AVLTree {
             node->right = insertHelper(node->right, key, id);
         } else { 
             node->debrisIds.push_back(id); 
+            if (node->debrisIds.size() >= 2) { 
+                node->isRedZone = true;       
+            }  
             return node; 
         }
 
         node->height = 1 + myMax(getHeight(node->left), getHeight(node->right));
         int balance = getBalance(node);
-
         if (balance > 1 && key < node->left->key) 
             return rotateRight(node);
         if (balance < -1 && key > node->right->key) 
@@ -94,6 +103,14 @@ class AVLTree {
         return node;
     }
 
+    AVLNode* findNodeHelper(AVLNode *node, long long key) { 
+        if (node == NULL || node->key == key)               
+            return node;      
+        if (key < node->key)                              
+            return findNodeHelper(node->left, key);         
+        return findNodeHelper(node->right, key);            
+    }                                                      
+
     std::vector<int> searchHelper(AVLNode *node, long long key) {
         if (node == NULL) 
             return std::vector<int>();
@@ -105,7 +122,8 @@ class AVLTree {
     }
 
     int countHelper(AVLNode *node) {
-        if (node == NULL) return 0;
+        if (node == NULL) 
+            return 0;
         return 1 + countHelper(node->left) + countHelper(node->right);
     }
 
@@ -131,5 +149,25 @@ public:
     }
     int countNodes() { 
         return countHelper(root); 
+    }
+
+    void markRedZone(long long key, std::string satName) {
+        AVLNode *n = findNodeHelper(root, key);
+        if (n != NULL) {
+            n->isRedZone = true;
+            if (n->flaggedBySat == "None") {
+                n->flaggedBySat = satName;
+            }
+        }
+    }
+
+    bool isSectorRedZone(long long key, std::string &flaggedBy, int &debrisCount) {
+        AVLNode *n = findNodeHelper(root, key);
+        if (n != NULL && n->isRedZone) {
+            flaggedBy = n->flaggedBySat;
+            debrisCount = (int)n->debrisIds.size();
+            return true;
+        }
+        return false;
     }
 };
