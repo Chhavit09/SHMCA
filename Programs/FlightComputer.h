@@ -103,6 +103,23 @@ public:
             debris->id << " fuel=2.5kg\n";
     }
 
+    //RED ZONE HANDLE
+    void handleRedZoneAvoidance(Satellite *sat, long long sectorKey, string flaggedBySat, 
+        int debrisCount, ofstream &logFile, double simTime) {
+        if (sat == NULL || sat->isDisabled())
+            return;
+
+        cout << "\n[RED ZONE ALERT] " << sat->getName() << " entered RED ZONE Sector [" << sectorKey 
+             << "] (Flagged by: " << flaggedBySat << " | Debris Count: " << debrisCount << ")" << endl;
+        logFile << "[t=" << simTime << "s] [RED ZONE ALERT] " << sat->getName() 
+                << " entered Red Zone sector=" << sectorKey << " flaggedBy=" << flaggedBySat 
+                << " debrisCount=" << debrisCount << "\n";
+
+        if (!sat->isThrusterOk() || !sat->useFuel(1.5)) {
+            cout << "ACTION: Cannot divert from Red Zone (Low fuel/thruster fault).\n";
+            return;
+        }
+        
     // HEALTH DECISION FUNCTION
     void handleHealthDecision(Satellite *sat, ofstream &logFile, double simTime) {
         if (sat == NULL) 
