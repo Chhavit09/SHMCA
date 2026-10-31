@@ -102,7 +102,38 @@ public:
         logFile << "[t=" << simTime << "s] [DECISION] " << sat->getName() << " performed evasive burn against debris #" << 
             debris->id << " fuel=2.5kg\n";
     }
+    // ==================== START OF ADDED SAT-TO-SAT BLOCK ====================
+    // OOP Unit 2: Function Overloading (SAT-TO-SAT COLLISION AVOIDANCE)
+    void handleCollisionThreat(Satellite *sat, Satellite *otherSat, double distance, 
+        ofstream &logFile, double simTime) {                                        
+        if (sat == NULL || otherSat == NULL)                                         
+            return;                                                                  
+        if (sat->isDisabled() || otherSat->isDisabled())                            
+            return;                                                                  
 
+        RiskLevel risk = checkCollisionRisk(distance);                              
+
+        if (risk == SAFE)                                                          
+            return;                                                                
+
+        if (risk == WARNING) {                                                      
+            cout << "[SAT-WARNING] " << sat->getName() << " -> Friendly Sat "      
+                 << otherSat->getName() << " Distance: " << distance << endl;       
+            logFile << "[t=" << simTime << "s] [SAT-WARNING] " << sat->getName()    
+                    << " near friendly sat " << otherSat->getName()                 
+                    << " distance=" << distance << "\n";                            
+            return;                                                                 
+        }                                                                            
+
+        cout << "\n!! SAT-TO-SAT COLLISION ALERT !!" << endl;                      
+        cout << "Satellite : " << sat->getName() << endl;                         
+        cout << "Target Sat: " << otherSat->getName() << endl;                     
+        cout << "Distance  : " << distance << endl;                                
+        cout << "Risk      : " << getRiskName(risk) << endl;                       
+        logFile << "[t=" << simTime << "s] [SAT-COLLISION ALERT] " << sat->getName() 
+                << " friendly sat " << otherSat->getName()                         
+                << " distance=" << distance << " risk=" << getRiskName(risk) << "\n";
+        
     //RED ZONE HANDLE
     void handleRedZoneAvoidance(Satellite *sat, long long sectorKey, string flaggedBySat, 
         int debrisCount, ofstream &logFile, double simTime) {
