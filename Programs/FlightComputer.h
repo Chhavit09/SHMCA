@@ -102,7 +102,7 @@ public:
         logFile << "[t=" << simTime << "s] [DECISION] " << sat->getName() << " performed evasive burn against debris #" << 
             debris->id << " fuel=2.5kg\n";
     }
-    // ==================== START OF ADDED SAT-TO-SAT BLOCK ====================
+   
     // OOP Unit 2: Function Overloading (SAT-TO-SAT COLLISION AVOIDANCE)
     void handleCollisionThreat(Satellite *sat, Satellite *otherSat, double distance, 
         ofstream &logFile, double simTime) {                                        
@@ -133,7 +133,21 @@ public:
         logFile << "[t=" << simTime << "s] [SAT-COLLISION ALERT] " << sat->getName() 
                 << " friendly sat " << otherSat->getName()                         
                 << " distance=" << distance << " risk=" << getRiskName(risk) << "\n";
-        
+        if (!sat->isThrusterOk()) {                                                  
+            cout << "ACTION: Thruster unavailable!\nACTION: Satellite sent for repair.\n";
+            logFile << "[t=" << simTime << "s] [DECISION] " << sat->getName()       
+                    << " thruster unavailable - repair required\n";                
+            sat->sendForRepair(logFile, simTime, "thruster failure during sat collision threat");
+            return;                                                                 
+        }                                                                            
+
+        if (!sat->useFuel(2.5)) {                                                   
+            cout << "ACTION: Insufficient fuel!\nACTION: Satellite sent for repair.\n"; 
+            logFile << "[t=" << simTime << "s] [DECISION] " << sat->getName()      
+                    << " insufficient fuel for sat evasive maneuver\n";             
+            sat->sendForRepair(logFile, simTime, "out of propellant");              
+            return;                                                                
+        }
     //RED ZONE HANDLE
     void handleRedZoneAvoidance(Satellite *sat, long long sectorKey, string flaggedBySat, 
         int debrisCount, ofstream &logFile, double simTime) {
@@ -151,11 +165,11 @@ public:
              return;
         }
         // diversion burn to exit the Red Zone
-        Vector3 diversionBurn(0.05, 0.05, 0.04);                                     // <--- ADDED
-        sat->burn(diversionBurn);                                                    // <--- ADDED
-        cout << "ACTION: RED ZONE DIVERSION BURN EXECUTED by " << sat->getName() << " (Fuel used: 1.5 kg)\n"; // <--- ADDED
-        logFile << "[t=" << simTime << "s] [RED ZONE AVOIDANCE] " << sat->getName()  // <--- ADDED
-                << " diverted from Red Zone sector=" << sectorKey << " fuel=1.5kg\n";// <--- ADDED
+        Vector3 diversionBurn(0.05, 0.05, 0.04);                                     
+        sat->burn(diversionBurn);                                                   
+        cout << "ACTION: RED ZONE DIVERSION BURN EXECUTED by " << sat->getName() << " (Fuel used: 1.5 kg)\n"; 
+        logFile << "[t=" << simTime << "s] [RED ZONE AVOIDANCE] " << sat->getName()  
+                << " diverted from Red Zone sector=" << sectorKey << " fuel=1.5kg\n";
     }
     // HEALTH DECISION FUNCTION
     void handleHealthDecision(Satellite *sat, ofstream &logFile, double simTime) {
