@@ -148,6 +148,22 @@ public:
             sat->sendForRepair(logFile, simTime, "out of propellant");              
             return;                                                                
         }
+        // EVASIVE BURN AWAY FROM OTHER SATELLITE
+        Vector3 satellitePosition = sat->getPos();                                  
+        Vector3 otherSatPosition = otherSat->getPos();                              
+        Vector3 relativePosition = otherSatPosition - satellitePosition;
+        double magnitude = dist3D(satellitePosition, otherSatPosition);
+        Vector3 direction(0, 0, 1);                                                 
+        if (magnitude > 0.001) {                                                   
+            direction = relativePosition * (-1.0 / magnitude);                      
+        }                                                                          
+        Vector3 burnAmount = direction * 0.08;                                 
+        sat->burn(burnAmount);                                                    
+        cout << "ACTION: SAT EVASIVE BURN ACTIVATED\nACTION: Satellite velocity changed\nFUEL USED: 2.5 kg\n";
+        logFile << "[t=" << simTime << "s] [DECISION] " << sat->getName()          
+                << " performed evasive burn against friendly sat "                 
+                << otherSat->getName() << " fuel=2.5kg\n";                       
+    }
     //RED ZONE HANDLE
     void handleRedZoneAvoidance(Satellite *sat, long long sectorKey, string flaggedBySat, 
         int debrisCount, ofstream &logFile, double simTime) {
