@@ -117,9 +117,15 @@ public:
 
         if (!sat->isThrusterOk() || !sat->useFuel(1.5)) {
             cout << "ACTION: Cannot divert from Red Zone (Low fuel/thruster fault).\n";
-            return;
+             return;
         }
-        
+        // diversion burn to exit the Red Zone
+        Vector3 diversionBurn(0.05, 0.05, 0.04);                                     // <--- ADDED
+        sat->burn(diversionBurn);                                                    // <--- ADDED
+        cout << "ACTION: RED ZONE DIVERSION BURN EXECUTED by " << sat->getName() << " (Fuel used: 1.5 kg)\n"; // <--- ADDED
+        logFile << "[t=" << simTime << "s] [RED ZONE AVOIDANCE] " << sat->getName()  // <--- ADDED
+                << " diverted from Red Zone sector=" << sectorKey << " fuel=1.5kg\n";// <--- ADDED
+    }
     // HEALTH DECISION FUNCTION
     void handleHealthDecision(Satellite *sat, ofstream &logFile, double simTime) {
         if (sat == NULL) 
