@@ -39,7 +39,6 @@ inline double dist3D(Vector3 a, Vector3 b)
 #include "Chaos_Engine.h"
 
 int REPAIR_DURATION_TICKS = 20;
-
 Satellite* createSatelliteAroundEarth(int id, string name, int typeChoice) 
 {
     double orbitRadius = 4200 + 600 + rand() % 400; 
@@ -121,7 +120,6 @@ int main()
     double simTime = 0, dt = 1.0;
     const double WATCH_DIST = 15.0;
     vector<RedZoneRecord> activeRedZones;
-
     for (int tick = 1; tick <= totalTicks; tick++) {
         simTime += dt;
         runChaosEngine(satellites, debrisList, nextDebrisId, logFile, simTime);
@@ -152,38 +150,36 @@ int main()
             satellites[i]->moveOneStep(dt);
             flightComputer.handleHealthDecision(satellites[i], logFile, simTime);
         }
-        
         for (int i = 0; i < satellites.size(); i++) {
             teleFile << tick << ",Sat," << satellites[i]->getName() << "," << satellites[i]->getPos().x << "," << satellites[i]->getPos().y << "," << satellites[i]->getPos().z << "\n";
         }
         for (int i = 0; i < debrisList.size(); i++) {
             teleFile << tick << ",Debris," << debrisList[i].id << "," << debrisList[i].pos.x << "," << debrisList[i].pos.y << "," << debrisList[i].pos.z << "\n";
         }
-        
         MinHeap heap;
-            for (int i = 0; i < satellites.size(); i++) 
-            {
-                if (satellites[i]->isDisabled()) 
-                    continue;
-                Vector3 sp = satellites[i]->getPos();
-                long long currentSatSector = getSectorKey(sp);
-                string flaggedBy = "None";
+        for (int i = 0; i < satellites.size(); i++) 
+        {
+            if (satellites[i]->isDisabled()) 
+                continue;
+            Vector3 sp = satellites[i]->getPos();
+            long long currentSatSector = getSectorKey(sp); // <--- ADDED
+            string flaggedBy = "None";
             int rzDebrisCount = 0;
             if (tree.isSectorRedZone(currentSatSector, flaggedBy, rzDebrisCount) && 
                 flaggedBy != "None" && flaggedBy != satellites[i]->getName()) {
                 flightComputer.handleRedZoneAvoidance(satellites[i], currentSatSector, flaggedBy, rzDebrisCount, logFile, simTime);
             }
-                long long bx = floor(sp.x / 100.0);
-                long long by = floor(sp.y / 100.0);
-                long long bz = floor(sp.z / 100.0);
-                for (int dx = -1; dx <= 1; dx++) {
-                    for (int dy = -1; dy <= 1; dy++) 
+            long long bx = floor(sp.x / 100.0);
+            long long by = floor(sp.y / 100.0);
+            long long bz = floor(sp.z / 100.0);
+            for (int dx = -1; dx <= 1; dx++) {
+                for (int dy = -1; dy <= 1; dy++) 
+                {
+                    for (int dz = -1; dz <= 1; dz++) 
                     {
-                        for (int dz = -1; dz <= 1; dz++) 
-                        {
-                            long long key = (bx + dx) * 1000000LL + (by + dy) * 1000LL + (bz + dz);
-                            vector<int> ids = tree.search(key);
-                            if (ids.size() >= 2) {
+                        long long key = (bx + dx) * 1000000LL + (by + dy) * 1000LL + (bz + dz);
+                        vector<int> ids = tree.search(key);
+                        if (ids.size() >= 2) {
                             tree.markRedZone(key, satellites[i]->getName());
                             bool alreadyRecorded = false;
                             for (int rz = 0; rz < activeRedZones.size(); rz++) {
@@ -206,23 +202,36 @@ int main()
                                         << " debrisCount=" << ids.size() << "\n";
                             }
                         }
-                            for (int k = 0; k < ids.size(); k++) 
+                        for (int k = 0; k < ids.size(); k++) 
+                        {
+                            Debris *d = findDebrisById(debrisList, ids[k]);
+                            if (d != NULL && dist3D(sp, d->pos) < WATCH_DIST) 
                             {
-                                Debris *d = findDebrisById(debrisList, ids[k]);
-                                if (d != NULL && dist3D(sp, d->pos) < WATCH_DIST) 
-                                {
-                                    Threat t;
-                                    t.satId = satellites[i]->getId();
-                                    t.debId = d->id;
-                                    t.distance = dist3D(sp, d->pos);
-                                    heap.push(t);
-                                }
+                                Threat t;
+                                t.satId = satellites[i]->getId();
+                                t.targetId = d->id;     
+                                t.isFriendlySat = false;
+                                t.distance = dist3D(sp, d->pos);
+                                heap.push(t);
                             }
                         }
                     }
                 }
             }
-            while (!heap.isEmpty()) {
+            for (int j = 0; j < satellites.size(); j++) {          
+                if (i == j || satellites[j]->isDisabled()) continue;    
+                double satDist = dist3D(sp, satellites[j]->getPos());     
+                if (satDist < WATCH_DIST) {                              
+                    Threat t;                                 
+                    t.satId = satellites[i]->getId();        
+                    t.targetId = satellites[j]->getId();         
+                    t.isFriendlySat = true;               
+                    t.distance = satDist;              
+                    heap.push(t);                     
+                }                                        
+            }                                                             
+        }
+        while (!heap.isEmpty()) {
             Threat th = heap.popMin();
             Satellite *sat = NULL;
             for (int i = 0; i < satellites.size(); i++) {
@@ -231,12 +240,23 @@ int main()
                     break; 
                 }
             }
-            Debris *d = findDebrisById(debrisList, th.debId);
-            flightComputer.handleCollisionThreat(sat, d, th.distance, logFile, simTime);
+            if (th.isFriendlySat) {                                                   
+                Satellite *otherSat = NULL;                                            
+                for (int i = 0; i < satellites.size(); i++) {                             
+                    if (satellites[i]->getId() == th.targetId) {                       
+                        otherSat = satellites[i];                                        
+                        break;                                                         
+                    }                                                                    
+                }                                                                       
+                flightComputer.handleCollisionThreat(sat, otherSat, th.distance, logFile, simTime); 
+            } else {                                                                    
+                Debris *d = findDebrisById(debrisList, th.targetId);                    
+                flightComputer.handleCollisionThreat(sat, d, th.distance, logFile, simTime);
+            }                                                                           
         }
+
         if (tick % 5 == 0 || tick == totalTicks) {
-            cout << "\n----- STATUS at t=" << simTime << "s -----\n";
-            for (int i = 0; i < satellites.size(); i++) {
+            cout << "\n----- STATUS at t=" << simTime << "s (Active Red Zones: " << activeRedZones.size() << ") -----\n"; 
                double minDist = 9999999.0;
                 string nearestName = "None";
                 for (int j = 0; j < satellites.size(); j++) {
