@@ -40,6 +40,8 @@ public:
 struct Threat {
     int satId;
     int debId;
+    int targetId;       
+    bool isFriendlySat; 
     double distance;
 };
 
