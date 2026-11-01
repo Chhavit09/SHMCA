@@ -120,6 +120,8 @@ int main()
     FlightComputer flightComputer; 
     double simTime = 0, dt = 1.0;
     const double WATCH_DIST = 15.0;
+    vector<RedZoneRecord> activeRedZones;
+
     for (int tick = 1; tick <= totalTicks; tick++) {
         simTime += dt;
         runChaosEngine(satellites, debrisList, nextDebrisId, logFile, simTime);
@@ -138,6 +140,9 @@ int main()
         AVLTree tree;
         for (int i = 0; i < debrisList.size(); i++) {
             tree.insert(getSectorKey(debrisList[i].pos), debrisList[i].id);
+        }
+        for (int rz = 0; rz < activeRedZones.size(); rz++) {
+            tree.markRedZone(activeRedZones[rz].sectorKey, activeRedZones[rz].flaggedBySat);
         }
         for (int i = 0; i < satellites.size(); i++) {
             if (satellites[i]->isDisabled()) { 
@@ -161,6 +166,13 @@ int main()
                 if (satellites[i]->isDisabled()) 
                     continue;
                 Vector3 sp = satellites[i]->getPos();
+                long long currentSatSector = getSectorKey(sp);
+                string flaggedBy = "None";
+            int rzDebrisCount = 0;
+            if (tree.isSectorRedZone(currentSatSector, flaggedBy, rzDebrisCount) && 
+                flaggedBy != "None" && flaggedBy != satellites[i]->getName()) {
+                flightComputer.handleRedZoneAvoidance(satellites[i], currentSatSector, flaggedBy, rzDebrisCount, logFile, simTime);
+            }
                 long long bx = floor(sp.x / 100.0);
                 long long by = floor(sp.y / 100.0);
                 long long bz = floor(sp.z / 100.0);
@@ -171,6 +183,29 @@ int main()
                         {
                             long long key = (bx + dx) * 1000000LL + (by + dy) * 1000LL + (bz + dz);
                             vector<int> ids = tree.search(key);
+                            if (ids.size() >= 2) {
+                            tree.markRedZone(key, satellites[i]->getName());
+                            bool alreadyRecorded = false;
+                            for (int rz = 0; rz < activeRedZones.size(); rz++) {
+                                if (activeRedZones[rz].sectorKey == key) {
+                                    alreadyRecorded = true;
+                                    break;
+                                }
+                            }
+                            if (!alreadyRecorded) {
+                                RedZoneRecord rec;
+                                rec.sectorKey = key;
+                                rec.flaggedBySat = satellites[i]->getName();
+                                rec.debrisCount = (int)ids.size();
+                                activeRedZones.push_back(rec);
+                                cout << "\n[RED ZONE DECLARED] " << satellites[i]->getName() 
+                                     << " flagged Sector [" << key << "] as a RED ZONE (" 
+                                     << ids.size() << " debris objects detected)!\n";
+                                logFile << "[t=" << simTime << "s] [RED ZONE DECLARED] " 
+                                        << satellites[i]->getName() << " flagged sector=" << key 
+                                        << " debrisCount=" << ids.size() << "\n";
+                            }
+                        }
                             for (int k = 0; k < ids.size(); k++) 
                             {
                                 Debris *d = findDebrisById(debrisList, ids[k]);
