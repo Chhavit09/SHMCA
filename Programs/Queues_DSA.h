@@ -39,7 +39,8 @@ public:
 // DSA Unit 2: Priority Queue (Min-Heap)
 struct Threat {
     int satId;
-    int debId;
+    int targetId;       
+    bool isFriendlySat; 
     double distance;
 };
 
