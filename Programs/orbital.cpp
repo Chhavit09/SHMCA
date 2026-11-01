@@ -78,8 +78,23 @@ int main()
     {
         string name;
         int typeChoice;
-        cout << "\nSatellite #" << (i + 1) << " Name (no spaces): ";
-        cin >> name;
+        while (true) {                                                       
+            cout << "\nSatellite #" << (i + 1) << " Name (no spaces): ";
+            cin >> name;
+            bool duplicate = false;                                          
+            for (int j = 0; j < satellites.size(); j++) {                    
+                if (satellites[j]->getName() == name) {                      
+                    duplicate = true;                                        
+                    break;                                                   
+                }                                                            
+            }                                                                
+            if (duplicate) {                                                 
+                cout << "Invalid! A satellite named '" << name               
+                     << "' already exists. Enter a unique name.\n";          
+            } else {                                                         
+                break;                                                       
+            }                                                                
+        }           
         cout << "Type (1: Communication, 2: Imaging): ";
         while (!(cin >> typeChoice) || (typeChoice != 1 && typeChoice != 2)) {
             cout << "Invalid input! Please enter strictly 1 or 2: ";
