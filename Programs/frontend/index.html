@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<!--
+  ORBITAL – Phase III website
+  Copyright (c) 2026 Chhavit (@Chhavit09), Harsh Jain (@harshj1214-hj), Satyam Kumar (@kr-Satyam09), and Sudhanshu Ojha (@sudhanshuOjha07)
+  All Rights Reserved. Proprietary and confidential: see LICENSE.txt for the terms.
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>ORBITAL – Satellite Health Monitoring &amp; Collision Avoidance</title>
+  <meta name="copyright" content="© 2026 Chhavit, Harsh Jain, Satyam Kumar and Sudhanshu Ojha. All Rights Reserved.">
+  <meta name="description" content="Phase III website for the ORBITAL satellite simulation (Team Sentra, DSCPP-III-2026-T004).">
+  <!-- No external resources: the page uses the computer's own fonts and works offline. -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip-link" href="#dock">Skip to playback controls</a>
+
+  <!-- 1. Full-viewport 3D scene (Canvas 2D, hand-written projection in js/render.js) -->
+  <canvas id="scene" role="img"
+    aria-label="3D view of Earth, satellites and debris. Drag to rotate, scroll or pinch to zoom, double-click to reset the view."></canvas>
+
+  <!-- 2. Top bar -->
+  <header class="topbar glass depth-1" id="topbar">
+    <div class="brand">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <circle cx="16" cy="16" r="6.5" fill="currentColor" opacity=".9"/>
+        <ellipse cx="16" cy="16" rx="14" ry="5.5" fill="none" stroke="currentColor" stroke-width="1.4" transform="rotate(-24 16 16)" opacity=".7"/>
+        <circle cx="28.2" cy="10.6" r="1.9" fill="currentColor"/>
+      </svg>
+      <div class="brand-text">
+        <h1 class="brand-title">Orbital</h1>
+        <p class="brand-sub">Satellite health monitoring &amp; collision avoidance</p>
+      </div>
+    </div>
+
+    <div class="badge-wrap">
+      <span id="mode-badge" class="mode-badge" data-mode="none">No run loaded</span>
+      <span id="demo-tag" class="demo-tag" hidden title="Generated in the browser – not output from the C++ program">Browser simulation</span>
+    </div>
+
+    <ul class="stats" id="stats" aria-label="Run statistics at the current time">
+      <li class="stat"><span class="stat-label">Satellites online</span><span class="stat-value" id="stat-sats">–</span></li>
+      <li class="stat"><span class="stat-label">Debris real / synthetic</span><span class="stat-value" id="stat-debris">–</span></li>
+      <li class="stat"><span class="stat-label">Active red zones</span><span class="stat-value" id="stat-zones">–</span></li>
+      <li class="stat"><span class="stat-label">Alerts so far</span><span class="stat-value" id="stat-alerts">–</span></li>
+      <li class="stat stat-minor"><span class="stat-label">Evasive burns</span><span class="stat-value" id="stat-burns">–</span></li>
+      <li class="stat stat-minor"><span class="stat-label">Repairs dispatched</span><span class="stat-value" id="stat-repairs">–</span></li>
+    </ul>
+
+    <div class="actions">
+      <button class="btn" id="new-run-btn" type="button">New run</button>
+      <button class="icon-btn" id="info-btn" type="button" aria-label="How Orbital works (I)" title="How it works (I)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.01"/></svg>
+      </button>
+      <button class="icon-btn" id="panels-btn" type="button" aria-pressed="false" aria-label="Hide panels (H)" title="Hide panels (H)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M9 4v16M15 4v16"/></svg>
+      </button>
+      <button class="icon-btn" id="fullscreen-btn" type="button" aria-label="Enter full screen" title="Full screen">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Camera presets -->
+  <div class="view-pill glass depth-1" id="view-pill" role="group" aria-label="Camera view">
+    <button type="button" class="seg" data-view="top" aria-pressed="false">Top-down</button>
+    <button type="button" class="seg" data-view="iso" aria-pressed="true">Isometric</button>
+    <button type="button" class="seg" data-view="follow" aria-pressed="false">Follow selected</button>
+    <span class="seg-sep" aria-hidden="true"></span>
+    <button type="button" class="seg burn-toggle" id="burn-toggle" aria-pressed="true" title="Zoom in and slow down at every evasive burn (B)">Burn focus</button>
+  </div>
+
+  <!-- Burn focus caption: shown while an evasive burn is replayed up close -->
+  <div class="burn-card glass depth-3" id="burn-card" role="status" aria-live="polite" hidden>
+    <div class="burn-head" id="burn-head" title="Drag to move · double-click to put back">
+      <span class="burn-grip" aria-hidden="true">⠿</span>
+      <span class="burn-tag">EVASIVE BURN</span>
+      <label class="burn-fade" title="Card opacity">
+        <span class="visually-hidden">Card opacity</span>
+        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/><path d="M8 2a6 6 0 0 1 0 12z"/></svg>
+        <input type="range" id="burn-opacity" min="25" max="100" step="5" value="70">
+      </label>
+      <span class="burn-phase" id="burn-phase"></span>
+    </div>
+    <p class="burn-what" id="burn-what"></p>
+    <p class="burn-detail" id="burn-detail"></p>
+    <p class="burn-legend">
+      <span class="key-line dashed" aria-hidden="true"></span>path it was on before the burn
+      <span class="key-line solid" aria-hidden="true"></span>path it took
+    </p>
+    <canvas class="burn-chart" id="burn-chart" aria-hidden="true"></canvas>
+    <p class="burn-sep" id="burn-sep"></p>
+    <div class="burn-actions">
+      <button type="button" class="btn" id="burn-skip">Skip</button>
+      <button type="button" class="btn" id="burn-off">Turn off Burn focus</button>
+    </div>
+  </div>
+
+  <!-- 3. Left column: satellite roster and legend -->
+  <div class="panel-left" id="left-col">
+  <aside class="panel glass depth-2" id="roster-panel" aria-labelledby="roster-title">
+    <div class="panel-head">
+      <h2 id="roster-title">Satellites</h2>
+      <span class="panel-count" id="roster-count"></span>
+      <button class="icon-btn small collapse-btn" type="button" aria-expanded="true" aria-controls="roster" aria-label="Collapse satellites panel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+      </button>
+    </div>
+    <div class="panel-body" id="roster">
+      <p class="empty-note">Load a run to see its satellites.</p>
+    </div>
+  </aside>
+
+  <section class="panel glass depth-2" id="legend-panel" aria-labelledby="legend-title">
+    <div class="panel-head">
+      <h2 id="legend-title">Legend</h2>
+      <button class="icon-btn small collapse-btn" type="button" aria-expanded="true" aria-controls="legend-body" aria-label="Collapse legend panel">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+      </button>
+    </div>
+    <div class="panel-body" id="legend-body">
+      <p class="legend-note">Point at a satellite or debris to see its details (tap on touch screens). Click to select it.</p>
+      <h3 class="legend-head">Objects</h3>
+      <ul class="legend-list">
+        <li><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><circle cx="14" cy="8" r="7" style="fill:var(--comm)" opacity=".25"/><circle cx="14" cy="8" r="3.6" style="fill:var(--comm)"/><circle cx="14" cy="8" r="1.4" fill="#fff"/></svg>Communication satellite</li>
+        <li><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><circle cx="14" cy="8" r="7" style="fill:var(--imaging)" opacity=".25"/><circle cx="14" cy="8" r="3.6" style="fill:var(--imaging)"/><circle cx="14" cy="8" r="1.4" fill="#fff"/></svg>Imaging satellite</li>
+        <li id="legend-neutral" hidden><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><circle cx="14" cy="8" r="7" style="fill:var(--sat-neutral)" opacity=".25"/><circle cx="14" cy="8" r="3.6" style="fill:var(--sat-neutral)"/></svg>Satellite, class not recorded</li>
+        <li><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><circle cx="11" cy="9" r="4.2" fill="none" style="stroke:var(--sat-neutral)" stroke-width="1.5"/><circle cx="19" cy="5" r="4" style="fill:#0a1022;stroke:var(--sat-neutral)" stroke-width="1"/><path d="M17.8 6.2l2.4-2.4" style="stroke:var(--sat-neutral)" stroke-width="1.3" stroke-linecap="round"/></svg>Satellite under repair</li>
+        <li id="legend-deb-real"><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><circle cx="14" cy="8" r="2.6" style="fill:var(--debris-real)"/></svg>Debris, real (catalogued)</li>
+        <li id="legend-deb-synth"><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><circle cx="14" cy="8" r="3" fill="none" style="stroke:var(--debris-synthetic)" stroke-width="1.3"/></svg>Debris, synthetic (chaos engine)</li>
+      </ul>
+      <h3 class="legend-head">Paths</h3>
+      <ul class="legend-list">
+        <li><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8H26" style="stroke:var(--comm)" stroke-width="1.6" stroke-dasharray="2 4" stroke-linecap="round"/></svg><span id="legend-path">Orbit path over the whole run</span></li>
+        <li><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><defs><linearGradient id="lg-trail" gradientUnits="userSpaceOnUse" x1="2" y1="0" x2="24" y2="0"><stop offset="0" stop-color="#4fd8f5" stop-opacity="0"/><stop offset="1" stop-color="#4fd8f5" stop-opacity=".9"/></linearGradient></defs><path d="M2 8H24" stroke="url(#lg-trail)" stroke-width="2" stroke-linecap="round"/><circle cx="24" cy="8" r="2.6" style="fill:var(--comm)"/></svg><span id="legend-trail">Trail, last 40 written frames</span></li>
+        <li id="legend-equator" hidden><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><path d="M2 8H26" style="stroke:var(--comm)" opacity=".6" stroke-width="1.2" stroke-dasharray="5 4"/></svg>Equator</li>
+      </ul>
+      <h3 class="legend-head">Risk to the nearest debris</h3>
+      <p class="legend-note" id="legend-watch">Line from a satellite to its nearest debris inside the watch distance; that debris takes the same colour.</p>
+      <ul class="legend-list">
+        <li><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><path d="M3 8H21" style="stroke:var(--safe)" stroke-width="1.6"/><circle cx="23" cy="8" r="2.6" style="fill:var(--safe)"/></svg><span>Safe <span class="legend-range mono" id="legend-safe"></span></span></li>
+        <li><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><path d="M3 8H21" style="stroke:var(--warning)" stroke-width="1.6"/><circle cx="23" cy="8" r="2.6" style="fill:var(--warning)"/></svg><span>Warning <span class="legend-range mono" id="legend-warning"></span></span></li>
+        <li><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><path d="M3 8H21" style="stroke:var(--danger)" stroke-width="1.6"/><circle cx="23" cy="8" r="2.6" style="fill:var(--danger)"/></svg><span>Danger <span class="legend-range mono" id="legend-danger"></span></span></li>
+        <li><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><path d="M3 8H21" style="stroke:var(--critical)" stroke-width="1.6"/><circle cx="23" cy="8" r="2.6" style="fill:var(--critical)"/></svg><span>Critical <span class="legend-range mono" id="legend-critical"></span></span></li>
+      </ul>
+      <h3 class="legend-head">Zones and events</h3>
+      <ul class="legend-list">
+        <li><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><g fill="none" style="stroke:var(--critical)" stroke-width="1.1"><path d="M8 5h10v9H8z"/><path d="M8 5l4-3h10l-4 3M22 2v9l-4 3"/></g></svg><span>Red zone sector <span class="legend-range mono" id="legend-sector"></span></span></li>
+        <li><svg class="sw" viewBox="0 0 28 16" aria-hidden="true"><circle cx="14" cy="8" r="6.5" fill="none" style="stroke:var(--tag-decision)" stroke-width="1.6"/><circle cx="14" cy="8" r="2.4" style="fill:var(--comm)"/></svg>Evasive burn (pulse)</li>
+      </ul>
+    </div>
+  </section>
+  </div>
+
+  <!-- 4 + 7. Right column: event feed and (real runs only) model accuracy -->
+  <div class="panel-right" id="right-col">
+    <section class="panel glass depth-2" id="events-panel" aria-labelledby="events-title">
+      <div class="panel-head">
+        <h2 id="events-title">Events</h2>
+        <span class="panel-count" id="events-count"></span>
+        <button class="icon-btn small collapse-btn" type="button" aria-expanded="true" aria-controls="events-body" aria-label="Collapse events panel">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+        </button>
+      </div>
+      <div class="panel-body" id="events-body">
+        <div class="chips" role="group" aria-label="Show event types">
+          <button type="button" class="chip" data-cat="collision" aria-pressed="true">Collision</button>
+          <button type="button" class="chip" data-cat="health" aria-pressed="true">Health</button>
+          <button type="button" class="chip" data-cat="chaos" aria-pressed="true">Chaos</button>
+          <button type="button" class="chip" data-cat="redzone" aria-pressed="true">Red zone</button>
+          <button type="button" class="chip" data-cat="repair" aria-pressed="true">Repair</button>
+        </div>
+        <ol class="feed" id="feed"><li class="feed-empty">Events appear here as the run reaches them.</li></ol>
+        <p class="feed-note" id="feed-note"></p>
+      </div>
+    </section>
+
+    <section class="panel glass depth-2" id="accuracy-panel" aria-labelledby="acc-title" hidden>
+      <div class="panel-head">
+        <h2 id="acc-title">Model accuracy</h2>
+        <button class="icon-btn small collapse-btn" type="button" aria-expanded="true" aria-controls="acc-body" aria-label="Collapse model accuracy panel">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+        </button>
+      </div>
+      <div class="panel-body" id="acc-body">
+        <canvas id="acc-chart" class="chart" role="img" aria-label="Position error in kilometres against elapsed time for each satellite"></canvas>
+        <div class="legend" id="acc-legend"></div>
+        <p class="caption">Distance between our simulator’s position and the SGP4 reference position for the same satellite, as simulated time goes on.</p>
+      </div>
+    </section>
+  </div>
+
+  <!-- 6. Detail sheet for the focused satellite -->
+  <section class="sheet glass depth-3" id="sheet" aria-labelledby="sheet-title" aria-hidden="true" inert>
+    <div class="sheet-head">
+      <span class="sheet-dot" id="sheet-dot" aria-hidden="true"></span>
+      <h2 id="sheet-title">Satellite</h2>
+      <span class="pill" id="sheet-class"></span>
+      <span class="status-tag" id="sheet-status"></span>
+      <button class="icon-btn small" id="sheet-close" type="button" aria-label="Close satellite details (Esc)">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div class="sheet-body">
+      <dl class="sheet-stats" id="sheet-stats"></dl>
+      <div class="sheet-charts">
+        <figure class="spark">
+          <figcaption>Distance to Earth’s centre <span class="mono dim" id="spark-earth-range"></span></figcaption>
+          <canvas id="spark-earth" class="chart" role="img" aria-label="Distance to Earth's centre over time"></canvas>
+        </figure>
+        <figure class="spark">
+          <figcaption>Nearest debris over time <span class="mono dim" id="spark-debris-range"></span></figcaption>
+          <canvas id="spark-debris" class="chart" role="img" aria-label="Nearest debris distance over time with warning, danger and critical thresholds"></canvas>
+        </figure>
+      </div>
+    </div>
+    <div class="sheet-events">
+      <h3>Events for this satellite</h3>
+      <ol class="feed compact" id="sheet-events"></ol>
+    </div>
+  </section>
+
+  <!-- 5 + 8. Bottom dock: transport, timeline, raw data -->
+  <footer class="dock glass depth-1" id="dock" tabindex="-1">
+    <div class="tab-panel raw" id="tab-raw" role="tabpanel" aria-labelledby="tab-btn-raw" hidden>
+      <div class="raw-toolbar">
+        <div class="seg-group" role="group" aria-label="Raw data view">
+          <button type="button" class="seg" data-raw="telemetry" aria-pressed="true">Telemetry rows</button>
+          <button type="button" class="seg" data-raw="log" aria-pressed="false">Log lines</button>
+        </div>
+        <label class="field" id="raw-filter-wrap">
+          <span>Show</span>
+          <select id="raw-filter">
+            <option value="all">All</option>
+            <option value="sat">Satellites</option>
+            <option value="debris">Debris</option>
+            <option value="real">Real</option>
+            <option value="synthetic">Synthetic</option>
+          </select>
+        </label>
+        <input type="search" id="raw-search" class="search" placeholder="Search name or id" aria-label="Search by satellite name or debris id">
+        <span class="raw-count mono" id="raw-count" aria-live="polite"></span>
+        <button class="btn" id="download-btn" type="button">Download current frame as CSV</button>
+      </div>
+      <div class="raw-scroll" id="raw-table-wrap">
+        <table class="raw-table" id="raw-table">
+          <thead id="raw-head"></thead>
+          <tbody id="raw-body"></tbody>
+        </table>
+      </div>
+      <div class="raw-scroll" id="raw-log-wrap" hidden>
+        <ol class="log-lines" id="raw-log"></ol>
+      </div>
+    </div>
+
+    <div class="transport-row">
+      <div class="dock-tabs" role="tablist" aria-label="Dock view">
+        <button type="button" role="tab" class="tab" id="tab-btn-timeline" aria-selected="true">Timeline</button>
+        <button type="button" role="tab" class="tab" id="tab-btn-raw" aria-selected="false" aria-controls="tab-raw" tabindex="-1">Raw data</button>
+      </div>
+      <div class="transport">
+        <button class="icon-btn" id="step-back" type="button" aria-label="Step back one written frame (Left arrow)" title="Step back (←)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5v14M18 6l-8 6 8 6z"/></svg>
+        </button>
+        <button class="icon-btn play-btn" id="play-btn" type="button" aria-label="Play (Space)" title="Play / pause (Space)">
+          <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+          <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14M16 5v14"/></svg>
+        </button>
+        <button class="icon-btn" id="step-fwd" type="button" aria-label="Step forward one written frame (Right arrow)" title="Step forward (→)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v14M6 6l8 6-8 6z"/></svg>
+        </button>
+      </div>
+      <div class="scrubber">
+        <canvas id="markers" aria-hidden="true"></canvas>
+        <div class="scrub-progress" id="scrub-progress"></div>
+        <input type="range" id="scrub" min="0" max="1" step="any" value="0" aria-label="Simulation time" disabled>
+      </div>
+      <div class="speed" role="group" aria-label="Playback speed" id="speed-group"></div>
+      <div class="clock-wrap">
+        <output class="clock mono" id="clock" aria-label="Elapsed simulated time">00:00:00 / 00:00:00</output>
+        <span class="rate mono" id="rate" title="How fast simulated time passes at the chosen speed"></span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Copyright and contributors, always at the bottom of the page -->
+  <div class="site-foot" id="site-foot" role="contentinfo">
+    <span>© 2026 <span class="foot-long">Chhavit, Harsh Jain, Satyam Kumar and Sudhanshu Ojha · </span>Team Sentra · All Rights Reserved · <button type="button" class="link-btn" data-action="license">License</button></span>
+  </div>
+
+  <!-- Empty state -->
+  <div class="empty-state glass depth-3" id="empty-state">
+    <h2>Start a run</h2>
+    <p>Satellite health monitoring and collision avoidance, shown in 3D. Choose where the run comes from.</p>
+    <div class="start-cards">
+      <div class="start-card">
+        <h3><span class="step">1</span>Real satellites and debris</h3>
+        <p>Load CelesTrak CSV files (several satellite and debris files at once). Only the objects in your files are simulated; no debris is invented.</p>
+        <button class="btn btn-primary" type="button" data-action="real-run">Load CelesTrak files</button>
+      </div>
+      <div class="start-card">
+        <h3><span class="step">2</span>Your own satellites</h3>
+        <p>Type satellites, ticks and thresholds, in C++ units or kilometres. Debris around them is generated automatically.</p>
+        <button class="btn" type="button" data-action="new-run">Enter satellites</button>
+      </div>
+    </div>
+    <p class="start-note">Both are simulated in this browser by a JavaScript copy of <code>orbital.cpp</code> and are labelled “Browser simulation”. You can also drop CelesTrak CSV files anywhere on the page.</p>
+    <div class="empty-actions">
+      <button class="btn" type="button" data-action="info">How it works</button>
+    </div>
+    <ul class="keys" aria-label="Keyboard shortcuts">
+      <li><kbd>Space</kbd> play or pause</li>
+      <li><kbd>←</kbd><kbd>→</kbd> step a frame</li>
+      <li><kbd>1</kbd>–<kbd>8</kbd> speed</li>
+      <li><kbd>Esc</kbd> clear selection</li>
+      <li><kbd>H</kbd> hide panels</li>
+      <li><kbd>I</kbd> how it works</li>
+      <li><kbd>B</kbd> burn focus</li>
+    </ul>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading glass depth-3" id="loading" role="status" aria-live="polite" hidden>
+    <p class="loading-stage" id="loading-stage">Loading</p>
+    <div class="progress"><div class="progress-fill" id="loading-fill"></div></div>
+    <div class="loading-foot">
+      <p class="loading-pct mono" id="loading-pct">0%</p>
+      <button class="btn" id="loading-cancel" type="button">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Details card shown when pointing at (or tapping) a satellite or debris.
+       Visual only: the same values are in the Raw data table for screen readers. -->
+  <div class="hover-tip glass depth-3" id="hover-tip" aria-hidden="true" hidden></div>
+
+  <!-- Notices (errors, warnings, load report) -->
+  <div class="notices" id="notices" aria-live="polite"></div>
+
+  <!-- New run: the user types in satellites, ticks and debris (simulated in the browser) -->
+  <dialog class="run-dialog glass depth-3" id="run-dialog" aria-labelledby="run-title" aria-describedby="run-sub">
+    <form id="run-form" novalidate>
+      <header class="run-head">
+        <h2 id="run-title">New run</h2>
+        <p class="run-sub" id="run-sub">Choose what to simulate. Runs are simulated in this browser by a JavaScript copy of orbital.cpp.</p>
+        <button type="button" class="icon-btn small run-close" data-close aria-label="Close without running">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+        <div class="run-tabs" role="tablist" aria-label="Kind of run">
+          <button type="button" role="tab" id="tab-real" data-tab="real" aria-controls="panel-real" aria-selected="true">
+            <strong>Real data</strong><span>Load CelesTrak satellite and debris CSV files</span>
+          </button>
+          <button type="button" role="tab" id="tab-own" data-tab="own" aria-controls="panel-own" aria-selected="false" tabindex="-1">
+            <strong>Your own satellites</strong><span>Type satellites; debris is generated for you</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="run-body">
+        <!-- 1. Real data: CelesTrak CSV files only, no invented debris -->
+        <section class="tab-panel" id="panel-real" role="tabpanel" aria-labelledby="tab-real" data-panel="real">
+          <div class="loader-grid">
+            <div class="loader" id="run-sat-zone" data-kind="sats">
+              <div class="loader-head">
+                <h3>Satellite files</h3>
+                <span class="loader-total" id="run-sat-total">None loaded</span>
+              </div>
+              <p class="loader-hint">CelesTrak GP data in CSV format, for example <code>stations.csv</code>. Choose several at once, or drop them here.</p>
+              <button type="button" class="btn" id="run-sat-pick">Add satellite CSV files</button>
+              <input type="file" id="run-sat-files" accept=".csv,.txt,.php,text/csv" multiple hidden>
+              <ul class="loaded-files" id="run-sat-list"></ul>
+            </div>
+            <div class="loader" id="run-deb-zone" data-kind="debris">
+              <div class="loader-head">
+                <h3>Debris files <small>optional</small></h3>
+                <span class="loader-total" id="run-deb-total">None loaded</span>
+              </div>
+              <p class="loader-hint">CelesTrak debris groups in CSV format, for example <code>iridium-33-debris.csv</code>. Choose several at once, or drop them here.</p>
+              <button type="button" class="btn" id="run-deb-pick">Add debris CSV files</button>
+              <input type="file" id="run-deb-files" accept=".csv,.txt,.php,text/csv" multiple hidden>
+              <ul class="loaded-files" id="run-deb-list"></ul>
+            </div>
+          </div>
+          <p class="import-note" id="run-real-note" aria-live="polite">Only the objects in your files are simulated: no debris is invented in real-data runs.</p>
+          <details class="import-links">
+            <summary>Where to get the files</summary>
+            <p>Run <code>tools/get_celestrak_data.bat</code> (Windows) or <code>tools/get_celestrak_data.sh</code> (macOS/Linux) to download six files, or open a link below. If the page shows text, press Ctrl+S and save it as a <code>.csv</code> file.</p>
+            <ul>
+              <li><span>Satellites</span><a href="https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&amp;FORMAT=csv" target="_blank" rel="noopener">Space stations</a><a href="https://celestrak.org/NORAD/elements/gp.php?GROUP=weather&amp;FORMAT=csv" target="_blank" rel="noopener">Weather</a><a href="https://celestrak.org/NORAD/elements/gp.php?GROUP=iridium-NEXT&amp;FORMAT=csv" target="_blank" rel="noopener">Iridium NEXT</a></li>
+              <li><span>Debris</span><a href="https://celestrak.org/NORAD/elements/gp.php?GROUP=cosmos-2251-debris&amp;FORMAT=csv" target="_blank" rel="noopener">Cosmos 2251</a><a href="https://celestrak.org/NORAD/elements/gp.php?GROUP=iridium-33-debris&amp;FORMAT=csv" target="_blank" rel="noopener">Iridium 33</a><a href="https://celestrak.org/NORAD/elements/gp.php?GROUP=fengyun-1c-debris&amp;FORMAT=csv" target="_blank" rel="noopener">Fengyun-1C</a></li>
+            </ul>
+          </details>
+        </section>
+
+        <!-- 2. Your own satellites, with the automatic debris generator -->
+        <section class="tab-panel" id="panel-own" role="tabpanel" aria-labelledby="tab-own" data-panel="own" hidden>
+          <fieldset class="run-mode">
+            <legend>Units and physics</legend>
+            <label class="radio">
+              <input type="radio" name="run-mode" value="classic" checked>
+              <span><strong>Classic</strong>Arbitrary units, nearly flat orbits, the C++ gravity rule</span>
+            </label>
+            <label class="radio">
+              <input type="radio" name="run-mode" value="real">
+              <span><strong>Kilometres</strong>Inclined orbits you choose, Newtonian gravity GM/r²</span>
+            </label>
+          </fieldset>
+
+          <fieldset>
+            <legend>Satellites <span class="mono dim" id="run-sat-count"></span></legend>
+            <div class="sat-tools">
+              <input class="input small" type="number" id="run-add-count" value="1" min="1" step="1" inputmode="numeric" aria-label="How many satellites to add">
+              <button type="button" class="btn" id="run-add">Add satellites</button>
+              <button type="button" class="btn" id="run-clear">Remove all</button>
+              <span class="hint">Names: letters, digits, _ . - and no spaces (the log uses one-word names).</span>
+            </div>
+            <div class="run-table-wrap">
+              <table class="run-table">
+                <thead>
+                  <tr>
+                    <th scope="col" class="num">#</th><th scope="col">Name</th><th scope="col">Type</th>
+                    <th scope="col" class="real-only">Altitude (km)</th><th scope="col" class="real-only">Inclination (°)</th>
+                    <th scope="col" class="real-only">RAAN (°)</th><th scope="col" class="real-only">Phase (°)</th>
+                    <th scope="col"><span class="visually-hidden">Remove</span></th>
+                  </tr>
+                </thead>
+                <tbody id="run-sats"></tbody>
+              </table>
+            </div>
+          </fieldset>
+
+          <fieldset>
+            <legend>Debris generator</legend>
+            <p class="import-note">Debris here is invented (synthetic), like the chaos engine in orbital.cpp.</p>
+            <div class="run-grid">
+              <label class="fld"><span>Starting debris near each satellite</span><input class="input" type="number" id="run-debris" min="0" step="1" inputmode="numeric"></label>
+              <label class="fld real-only"><span>Debris on their own orbits</span><input class="input" type="number" id="run-catalog" min="0" step="1" inputmode="numeric"></label>
+            </div>
+          </fieldset>
+        </section>
+
+
+        <!-- Shared by Real data and Your own satellites -->
+        <fieldset class="run-shared">
+          <legend>Run settings</legend>
+          <div class="run-grid">
+            <label class="fld"><span>Ticks to run</span><input class="input" type="number" id="run-ticks" min="1" step="1" inputmode="numeric"></label>
+            <label class="fld"><span>Repair duration (ticks)</span><input class="input" type="number" id="run-repair" min="1" step="1" inputmode="numeric"></label>
+            <label class="fld"><span>Chaos event every N ticks <small id="run-chaos-note">0 = off</small></span><input class="input" type="number" id="run-chaos" min="0" step="1" inputmode="numeric"></label>
+          </div>
+        </fieldset>
+
+        <details class="run-adv run-shared">
+          <summary>Advanced: output, thresholds and random seed</summary>
+          <div class="run-grid">
+            <label class="fld"><span>Write telemetry every N ticks</span><input class="input" type="number" id="run-write" min="1" step="1" inputmode="numeric"></label>
+            <label class="fld"><span>Random seed <small>same seed, same run</small></span><input class="input" type="number" id="run-seed" min="0" step="1" inputmode="numeric"></label>
+            <label class="fld"><span>Sector size (<span class="unit-label">units</span>)</span><input class="input" type="number" id="run-sector" min="0" step="any"></label>
+            <label class="fld"><span>Watch distance (<span class="unit-label">units</span>)</span><input class="input" type="number" id="run-watch" min="0" step="any"></label>
+            <label class="fld"><span>Warning below (<span class="unit-label">units</span>)</span><input class="input" type="number" id="run-warn" min="0" step="any"></label>
+            <label class="fld"><span>Danger below (<span class="unit-label">units</span>)</span><input class="input" type="number" id="run-danger" min="0" step="any"></label>
+            <label class="fld"><span>Critical below (<span class="unit-label">units</span>)</span><input class="input" type="number" id="run-critical" min="0" step="any"></label>
+          </div>
+          <label class="check">
+            <input type="checkbox" id="run-cpa" checked>
+            <span><strong>Check closest approach between ticks</strong>A crossing debris moves about 10 km each second, so a check once per tick misses most close passes. With this on, each tick works out how close every nearby object will get during the next second, and alerts and evasive burns use that distance. orbital.cpp checks only at ticks: turn this off to match it exactly.</span>
+          </label>
+        </details>
+      </div>
+
+      <footer class="run-foot">
+        <div class="run-status">
+          <p class="run-estimate" id="run-estimate" aria-live="polite"></p>
+          <ul class="run-errors" id="run-errors"></ul>
+        </div>
+        <button type="button" class="btn" data-close>Cancel</button>
+        <button type="submit" class="btn btn-primary" id="run-submit">Run simulation</button>
+      </footer>
+    </form>
+  </dialog>
+
+  <!-- About: how the simulation and this website work -->
+  <dialog class="run-dialog info-dialog glass depth-3" id="info-dialog" aria-labelledby="info-title">
+    <div class="info-wrap">
+      <header class="run-head">
+        <h2 id="info-title">How Orbital works</h2>
+        <p class="run-sub">Satellite Health Monitoring and Collision Avoidance by Team Sentra: the logic of the C++ program <code>orbital.cpp</code>, simulated and shown in 3D in this website.</p>
+        <button type="button" class="icon-btn small run-close" data-close aria-label="Close">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </header>
+
+      <div class="run-body info-body">
+        <nav class="info-toc" aria-label="Sections">
+          <a href="#info-run">This run</a><a href="#info-what">What it is</a><a href="#info-start">Ways to start</a><a href="#info-tick">One tick</a>
+          <a href="#info-browser">Browser simulator</a><a href="#info-site">Files to screen</a><a href="#info-physics">Physics</a><a href="#info-risk">Risk and red zones</a>
+          <a href="#info-health">Health and repair</a><a href="#info-dsa">Data structures</a><a href="#info-sources">Kinds of run</a>
+          <a href="#info-limits">Limitations</a><a href="#info-keys">Controls</a><a href="#info-team">Team</a><a href="#info-license">License</a><a href="#info-privacy">Privacy</a>
+        </nav>
+
+        <section id="info-run" class="info-sec">
+          <h3>This run</h3>
+          <div id="info-run-body"></div>
+        </section>
+
+        <section id="info-what" class="info-sec">
+          <h3>What it is</h3>
+          <p>Earth’s orbit is filling with debris. Orbital simulates satellites that look after themselves: they find nearby debris, judge the risk, burn fuel to dodge, fix software faults on their own, and call for repair when hardware fails.</p>
+          <p>The simulation is the team’s C++ program <code>orbital.cpp</code>. This website runs a JavaScript copy of it in your browser, with the same tick order, gravity, chaos engine, threat scan and decisions, and shows the run in 3D. Runs start from real CelesTrak satellite and debris data or from satellites you type in, and are labelled “Browser simulation”.</p>
+          <p>Replaying the files <code>orbital.cpp</code> writes is switched off for now.</p>
+        </section>
+
+        <section id="info-start" class="info-sec">
+          <h3>Ways to start a run</h3>
+          <dl class="info-dl">
+            <dt>1. Real satellites and debris</dt><dd><strong>New run → Real data.</strong> Two loaders, <em>Satellite files</em> and <em>Debris files</em>, each take several CelesTrak GP CSV files at once (button or drop). Every object in the files is used; a satellite listed in two files counts once. Station modules and docked spacecraft that CelesTrak lists separately with the station’s own orbit (such as POISK on the ISS) are joined to their station, because objects at the same spot would otherwise raise a satellite collision alert every second. All orbits start together at the newest epoch in the files. No debris is invented: the chaos engine still causes faults (solar flares, bugs, sensor faults) but adds no debris. Files dropped on the page are sorted automatically: names with DEB or R/B go to Debris.</dd>
+            <dt>2. Your own satellites</dt><dd><strong>New run → Your own satellites.</strong> Type satellites (name, type and, in kilometre mode, altitude, inclination, RAAN and phase) in C++ units or kilometres. The <em>Debris generator</em> sets how much invented debris starts near each satellite and on its own orbits; the chaos engine adds more during the run. This is the only kind of run with invented debris.</dd>
+          </dl>
+          <p>Get CelesTrak files with <code>tools/get_celestrak_data.bat</code> (Windows) or <code>tools/get_celestrak_data.sh</code> (macOS/Linux), which download three satellite groups (stations, weather, Iridium NEXT) and three debris clouds (Cosmos 2251, Iridium 33, Fengyun-1C).</p>
+        </section>
+
+        <section id="info-tick" class="info-sec">
+          <h3>One tick inside orbital.cpp</h3>
+          <p>Every tick (<span data-info="dt"></span> simulated second<span data-info-plural="dt"></span>) the program runs these steps, in this order:</p>
+          <ol class="flow">
+            <li><strong>Chaos engine</strong>Picks a random satellite. It may suffer a solar flare (6% chance, software −15 to −44%), battery drain (7%, −3 to −10%), thruster burnout (2%), a program bug (5%, software −35%) or a sensor fault (3%). With a 25% chance a new debris object appears near it.</li>
+            <li><strong>Debris moves</strong>Gravity pulls each debris object towards Earth, then it moves one step.</li>
+            <li><strong>AVL tree built</strong>Every debris object is filed under its 3D sector (cubes of <span data-info="sectorSize" data-unit></span>). Red zones declared earlier are marked again.</li>
+            <li><strong>Satellites update</strong>A satellite under repair counts down its repair time. Every other satellite moves, uses battery and fuel, and gets a health check from the flight computer.</li>
+            <li><strong>Telemetry written</strong>The position (and health) of every object goes into <code>telemetry.csv</code>.</li>
+            <li><strong>Threat scan</strong>For each working satellite: is its own sector a red zone flagged by another satellite? Then the AVL tree is searched for the 27 sectors around it. A sector holding 2 or more debris is declared a red zone. Any debris or satellite closer than the watch distance (<span data-info="watchDist" data-unit></span>) becomes a threat in the min-heap.</li>
+            <li><strong>Decisions</strong>The min-heap hands over the nearest threat first. WARNING: logged only. DANGER or CRITICAL: collision alert; if the thruster works and 2.5 kg of fuel is left, an evasive burn pushes the satellite away; otherwise it is sent for repair.</li>
+            <li><strong>Log and status</strong>Every event is written to <code>blackbox.txt</code>; a status table is printed every 5 ticks. After the last tick you can search for a satellite by name.</li>
+          </ol>
+        </section>
+
+        <section id="info-browser" class="info-sec">
+          <h3>The browser simulator</h3>
+          <p>Both kinds of run are simulated by a JavaScript copy of <code>orbital.cpp</code>: the same tick order, gravity, chaos engine, thresholds, red zones and nearest-first threat order. The differences:</p>
+          <dl class="info-dl">
+            <dt>Closest approach</dt><dd>A crossing debris moves about 10 km relative to a satellite every second, so <code>orbital.cpp</code>, which checks distances once per tick, misses most close passes between two checks. With <em>Check closest approach between ticks</em> on (New run → Advanced, on by default), each tick works out from the relative position <var>r</var> and velocity <var>v</var> how close every nearby object will get during the next tick, <var>|r + v·t*|</var> with <var>t*</var> = −(<var>r·v</var>)/|<var>v</var>|² limited to one tick, and warnings, alerts and evasive burns use that distance. The alert therefore comes before the closest point. Turn it off to match <code>orbital.cpp</code> exactly.</dd>
+            <dt>Neighbouring satellites</dt><dd>Satellites are bucketed in a grid instead of comparing every pair as the C++ does; the result is the same, only faster with hundreds of satellites.</dd>
+            <dt>Run size</dt><dd>Telemetry holds one row per object per written tick, so 180 satellites and 4,000 debris over 600 written frames is about 2.5 million rows. One browser tab holds about 1.5 million comfortably and a run may take up to 2 minutes; the form estimates both as you type. A run over the limit shows a <strong>Fix</strong> button that writes telemetry less often (the run itself is unchanged; every tick is still simulated and checked) or, if the run is too slow, uses fewer ticks.</dd>
+            <dt>Thresholds</dt><dd>At 10 km, close passes with debris are genuinely rare. Real operators screen with zones of tens of kilometres; set Watch and Warning to 50, Danger 20, Critical 5 and Sector 50 under Advanced to see debris avoidance often.</dd>
+          </dl>
+        </section>
+
+        <section id="info-site" class="info-sec">
+          <h3>From simulation to screen (this website)</h3>
+          <ol class="flow flow-row">
+            <li><strong>Simulate</strong>The browser copy of <code>orbital.cpp</code> runs every tick and writes, in memory, the same three outputs: <code>telemetry.csv</code>, <code>blackbox.txt</code> and <code>run_info.txt</code>.</li>
+            <li><strong>Settings</strong><code>run_info.txt</code> gives the units, Earth radius and thresholds of the run.</li>
+            <li><strong>Parse</strong>Telemetry columns are read by name; each event line of the log becomes an event.</li>
+            <li><strong>Index</strong>Rows are grouped into frames, one per written tick.</li>
+            <li><strong>Derive</strong>Once: nearest distances, risk, repair periods, red-zone cubes, counters.</li>
+            <li><strong>Draw</strong>About 60 times a second: positions between written ticks are blended, rotated, projected and drawn far to near.</li>
+          </ol>
+        </section>
+
+        <section id="info-physics" class="info-sec">
+          <h3>Physics</h3>
+          <dl class="info-dl">
+            <dt>Classic mode</dt><dd>Arbitrary units, Earth radius 4000. Gravity follows the C++ rule acceleration = 6.5² ÷ r, which keeps a circular speed of 6.5 units per tick. Satellites start 4800–5200 units out on nearly flat orbits.</dd>
+            <dt>Real-data mode</dt><dd>Kilometres and seconds. Newtonian gravity GM ÷ r² with GM = 398,600 km³/s²: a satellite at 400 km circles Earth in about 92 minutes at 7.7 km/s.</dd>
+            <dt>Real orbits</dt><dd>A CelesTrak file gives each object’s orbital elements at its epoch. They are turned into a position and velocity at the common start time with Kepler’s equation and the slow drift caused by the Earth’s flattening (J2). This approximates SGP4, the model CelesTrak’s elements are made for: expect a few kilometres of difference at the start, growing with time.</dd>
+            <dt>Low and high orbits</dt><dd>Most satellites and all debris clouds are in low Earth orbit, 400–1,000 km up, circling in about 90–105 minutes. Geostationary weather satellites (GOES, Meteosat, Himawari, Elektro, Fengyun-2, INSAT) are 35,786 km up, 6.6 Earth radii from the centre, and take a day per orbit, so they look far away and move only about 25° in a 100-minute run. Their dotted paths are short arcs for that reason.</dd>
+            <dt>Moving objects</dt><dd>Each tick: velocity += gravity × dt, then position += velocity × dt (semi-implicit Euler).</dd>
+            <dt>Earth image</dt><dd>In real-data runs the Earth turns once per sidereal day (23 h 56 min), starting from the run’s date, so continents sit roughly under the orbits.</dd>
+          </dl>
+        </section>
+
+        <section id="info-risk" class="info-sec">
+          <h3>Risk levels and red zones</h3>
+          <table class="info-table">
+            <thead><tr><th scope="col">Distance to the threat</th><th scope="col">Risk</th><th scope="col">What the satellite does</th></tr></thead>
+            <tbody>
+              <tr><td><span data-info="warnDist" data-unit></span> or more</td><td><span class="risk-dot" style="--c:var(--safe)"></span>Safe</td><td>Nothing</td></tr>
+              <tr><td><span data-info="dangerDist"></span> to <span data-info="warnDist" data-unit></span></td><td><span class="risk-dot" style="--c:var(--warning)"></span>Warning</td><td>Logs a WARNING</td></tr>
+              <tr><td><span data-info="criticalDist"></span> to <span data-info="dangerDist" data-unit></span></td><td><span class="risk-dot" style="--c:var(--danger)"></span>Danger</td><td>Collision alert, evasive burn (2.5 kg)</td></tr>
+              <tr><td>under <span data-info="criticalDist" data-unit></span></td><td><span class="risk-dot" style="--c:var(--critical)"></span>Critical</td><td>Collision alert, evasive burn (2.5 kg)</td></tr>
+            </tbody>
+          </table>
+          <p>Only objects inside the watch distance (<span data-info="watchDist" data-unit></span>) are checked. In <code>orbital.cpp</code> the distance is the one at the tick; in browser runs with closest approach on, it is the closest the two will get during the next tick. A burn changes velocity by 0.08 directly away from the threat. With no thruster or not enough fuel, the satellite is dispatched for repair instead.</p>
+          <p><strong>Red zones:</strong> when a satellite finds 2 or more debris in one sector near it, it declares that sector a red zone for everyone. If another satellite later enters it, it logs a RED ZONE ALERT and, if it can, makes a diversion burn using 1.5 kg of fuel. Red zones are never cleared.</p>
+        </section>
+
+        <section id="info-health" class="info-sec">
+          <h3>Health and repair</h3>
+          <dl class="info-dl">
+            <dt>Starting state</dt><dd>Battery 100%, software 100%, fuel 50 kg. Each tick uses 0.02% battery and 0.01 kg fuel.</dd>
+            <dt>Health check</dt><dd>A sensor or thruster fault sends the satellite for repair (DISPATCH). Otherwise it runs its own diagnostics.</dd>
+            <dt>Communication satellites</dt><dd>Signal falls 0.05% per tick and is re-tuned below 40%. Software under 70% is auto-patched back to 100%.</dd>
+            <dt>Imaging satellites</dt><dd>Calibration falls 0.05% per tick (0.5% when battery is under 30%) and is recalibrated below 50%. Software under 75% is auto-patched.</dd>
+            <dt>Repair</dt><dd>Takes the number of ticks entered at the start. Afterwards thruster and sensors work, software and battery are 100%, and 25 kg of fuel is added (up to 50 kg). In the C++ a satellite does not move while under repair.</dd>
+          </dl>
+        </section>
+
+        <section id="info-dsa" class="info-sec">
+          <h3>Data structures and OOP</h3>
+          <table class="info-table">
+            <thead><tr><th scope="col">Concept</th><th scope="col">Where</th><th scope="col">Job in the simulation</th></tr></thead>
+            <tbody>
+              <tr><td>AVL tree</td><td><code>AVL_Tree.h</code></td><td>Debris filed by sector key, so a satellite searches only its 27 neighbouring sectors (O(log n) each) instead of every debris object.</td></tr>
+              <tr><td>Min-heap</td><td><code>Queues_DSA.h</code></td><td>Priority queue of threats: the nearest one is handled first.</td></tr>
+              <tr><td>Circular queue</td><td><code>Queues_DSA.h</code></td><td>Keeps each satellite’s last 10 battery readings.</td></tr>
+              <tr><td>Linear search</td><td><code>orbital.cpp</code></td><td>Finds a satellite by name after the run.</td></tr>
+              <tr><td>Abstract class and inheritance</td><td><code>Satellites_OOP.h</code></td><td><code>Satellite</code> with <code>CommunicationSatellite</code> and <code>ImagingSatellite</code>; <code>runDiagnostics()</code> is a virtual function.</td></tr>
+              <tr><td>Function overloading</td><td><code>FlightComputer.h</code></td><td><code>handleCollisionThreat()</code> for debris and for another satellite.</td></tr>
+              <tr><td>Operator overloading</td><td><code>orbital.cpp</code></td><td><code>Vector3</code> supports +, − and × for the physics.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="info-sources" class="info-sec">
+          <h3>Kinds of run</h3>
+          <table class="info-table">
+            <thead><tr><th scope="col">Shown as</th><th scope="col">Made by</th><th scope="col">How to treat it</th></tr></thead>
+            <tbody>
+              <tr><td>Browser simulation</td><td>New run → Your own satellites, with generated debris</td><td>Preview only; not produced by the C++.</td></tr>
+              <tr><td>REAL DATA · CelesTrak GP + Browser simulation</td><td>New run → Real data: CelesTrak satellite and debris CSV files, simulated in the browser</td><td>Real starting positions from your files, approximate motion (not SGP4, not the C++). No invented debris.</td></tr>
+            </tbody>
+          </table>
+        </section>
+
+        <section id="info-limits" class="info-sec">
+          <h3>Limitations</h3>
+          <ul class="info-list">
+            <li>Distances and risk on screen are worked out only at written ticks; between them positions are blended in a straight line, so a close pass between written ticks shows in the events but may not be drawn.</li>
+            <li>orbital.cpp checks distances only at whole ticks, so fast debris (about 10 km/s relative) can pass a satellite between two checks unseen. Browser runs can instead use each pair’s closest approach during the next tick (New run → Advanced); orbital.cpp does not.</li>
+            <li>Red zones are fixed boxes in space and are never cleared. At orbital speed debris leaves a small box within seconds, so many zones pile up.</li>
+            <li>The C++ thresholds are fixed at 15 / 10 / 5 and it burns fuel on every tick a threat lasts.</li>
+            <li>The Earth picture is a generated illustration with hand-traced coastlines, not satellite imagery.</li>
+            <li>The frosted-glass panels have to blur the moving scene behind them every frame. Runs with more than 1,500 objects therefore use solid panels, and so does any run that plays below 40 frames a second.</li>
+            <li>Every satellite shows its name and dotted orbit path. Where names would overlap, the farther ones wait until you zoom in or turn the view. With more than 60 satellites only the selected one has a fading trail, and above 150 the roster shows one line per satellite.</li>
+          </ul>
+        </section>
+
+        <section id="info-keys" class="info-sec">
+          <h3>Controls</h3>
+          <ul class="keys info-keys">
+            <li><kbd>Space</kbd> play or pause</li><li><kbd>←</kbd><kbd>→</kbd> step a frame</li><li><kbd>1</kbd>–<kbd>8</kbd> speed</li>
+            <li><kbd>Esc</kbd> clear selection</li><li><kbd>H</kbd> hide panels</li><li><kbd>I</kbd> this window</li><li><kbd>B</kbd> Burn focus on/off</li>
+          </ul>
+          <p>Drag to rotate, scroll or pinch to zoom, double-click to reset. Point at an object for its details; click to select it. At 1× a typical satellite takes about 2½ minutes per orbit (about 40 times real time in low orbit); 0.1× and 0.25× slow it down to watch single events, and the line under the clock shows how fast simulated time is running. Clicking an event pauses at that moment; ← and → then step through it frame by frame. <strong>Burn focus</strong> (on by default, key B): whenever playback reaches an evasive burn, the camera flies to that satellite, replays the moment in slow motion and shows the threat with its live distance, the path the satellite was on before the burn (dashed, continued from its motion just before the burn with the simulation’s gravity) and the path it actually took (solid). Clicking an evasive-burn event replays it the same way.</p>
+          <p><strong>Burn focus</strong> (on by default; <kbd>B</kbd> or the Burn focus button switches it): at every evasive burn the playback slows down, the camera turns to the satellite, and a card compares the path it was on with the path it took. Drag the card by its top line to move it, set its see-through level with the slider in that line, and double-click the line to put it back; the website remembers both.</p>
+        </section>
+
+        <section id="info-team" class="info-sec">
+          <h3>Team</h3>
+          <p><strong>Team Sentra</strong>, DSCPP-III-2026-T004, Department of Computer Science &amp; Engineering, Graphic Era (Deemed to be University), Dehradun. Mentor: Mr. Utkarsh Pant.</p>
+          <ul class="info-list">
+            <li>Chhavit (team lead, GitHub Chhavit09): <code>Satellites_OOP.h</code>, fuel use, nearest-satellite tracking</li>
+            <li>Harsh Jain (harshj1214-hj): <code>Chaos_Engine.h</code>, <code>FlightComputer.h</code>, search by name</li>
+            <li>Satyam Kumar (kr-Satyam09): <code>AVL_Tree.h</code>, vector maths, gravity</li>
+            <li>Sudhanshu Ojha (sudhanshuOjha07): <code>Queues_DSA.h</code> (min-heap, circular queue), input checks</li>
+          </ul>
+        </section>
+
+        <section id="info-license" class="info-sec">
+          <h3>License</h3>
+          <p>ORBITAL, its C++ simulation and this website are proprietary. Only the four contributors named below may view, modify and run them, for academic and project evaluation; nobody else may copy, publish or distribute any part without their written permission. The full terms, as in <code>LICENSE.txt</code>:</p>
+          <pre class="license-text">Copyright (c) 2026 Chhavit (@Chhavit09), Harsh Jain (@harshj1214-hj), Satyam Kumar (@kr-Satyam09), and Sudhanshu Ojha (@sudhanshuOjha07)
+
+All Rights Reserved.
+
+This software and its source code are proprietary and confidential.
+Permission is hereby granted solely to the designated project contributors
+officially listed above to view, modify, and execute this software for
+academic and project evaluation purposes:
+
+1. Chhavit (GitHub: Chhavit09)
+2. Harsh Jain (GitHub: harshj1214-hj)
+3. Satyam Kumar (GitHub: kr-Satyam09)
+4. Sudhanshu Ojha (GitHub: sudhanshuOjha07)
+
+No external person, organization, or entity may copy, reproduce, modify, merge,
+publish, distribute, sublicense, or sell any part of this code in any form
+without explicit prior written permission from the copyright holders.</pre>
+          <p>Orbital data you load from CelesTrak remains subject to CelesTrak’s terms and is not part of this licence.</p>
+        </section>
+
+        <section id="info-privacy" class="info-sec">
+          <h3>Privacy</h3>
+          <p>Everything happens on your own computer. CelesTrak CSV files you load are read by your browser and never uploaded; the only network request is for the two fonts (Inter and JetBrains Mono) from Google Fonts, and there are no analytics, cookies or accounts. The links to CelesTrak only open when you click them.</p>
+          <p>The page remembers one thing in your browser’s local storage on this computer: the position and opacity you chose for the evasive-burn card. Clearing the site data in your browser removes it.</p>
+        </section>
+      </div>
+
+      <footer class="run-foot">
+        <span class="run-status info-foot">Numbers marked with units come from the loaded run’s settings (the classic C++ values until a run is loaded).</span>
+        <button type="button" class="btn btn-primary" data-close id="info-close">Close</button>
+      </footer>
+    </div>
+  </dialog>
+
+  <!-- Drag-and-drop overlay -->
+  <div class="drop-overlay" id="drop-overlay" hidden>
+    <p>Drop CelesTrak CSV files (satellites or debris)</p>
+  </div>
+
+  <!-- scripts load in this order; ui.js is last and starts the app -->
+  <script src="js/core.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/simulator.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/playback.js"></script>
+  <script src="js/panels.js"></script>
+  <script src="js/ui.js"></script>
+</body>
+</html>
